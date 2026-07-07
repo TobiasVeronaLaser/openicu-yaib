@@ -1,7 +1,14 @@
 #!/usr/bin/env Rscript
 
-# Export RICU stay_windows("miiv", interval = hours(1)) for Python debugging.
-# Output: /home/q039tl/output/openicu_yaib_converter/ricu_stay_windows_miiv.parquet by default.
+# Export RICU stay windows for Python comparison.
+#
+# Defaults:
+#   RICU_SRC        = miiv
+#   RICU_OUT_DIR    = ~/output/openicu_yaib
+#   RICU_WINDOW_OUT = ${RICU_OUT_DIR}/ricu_stay_windows_${RICU_SRC}.parquet
+#
+# Example:
+#   RICU_OUT_DIR="$HOME/output/openicu_yaib" Rscript scripts/export_ricu_stay_windows.R
 
 suppressPackageStartupMessages({
   library(ricu)
@@ -10,14 +17,22 @@ suppressPackageStartupMessages({
 })
 
 src <- Sys.getenv("RICU_SRC", unset = "miiv")
-out <- Sys.getenv("RICU_STAY_WINDOWS_OUT", unset = "/home/q039tl/output/openicu_yaib_converter/ricu_stay_windows_miiv.parquet")
+out_dir <- Sys.getenv(
+  "RICU_OUT_DIR",
+  unset = file.path(Sys.getenv("HOME"), "output", "openicu_yaib")
+)
+out <- Sys.getenv(
+  "RICU_WINDOW_OUT",
+  unset = file.path(out_dir, sprintf("ricu_stay_windows_%s.parquet", src))
+)
+
+dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
 
 interval <- as.difftime(1, units = "hours")
 patients <- stay_windows(src, interval = interval)
-#patients <- stay_windows(src, interval = hours(1))
 dt <- as.data.table(patients)
 
-# Keep original column names. Typical columns include stay_id and end.
+# Keep original column names. Typical columns include stay_id, start, and end.
 print(names(dt))
 print(head(dt))
 print(meta_vars(patients))

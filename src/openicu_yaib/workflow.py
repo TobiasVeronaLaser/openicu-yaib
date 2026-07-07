@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import os
 
 import polars as pl
 
@@ -94,6 +95,41 @@ def dataset_ricu_code(dataset: str) -> str:
     return mapping[key]
 
 
+
+
+def _env_path(name: str) -> Path | None:
+    """Return an expanded path from an environment variable if it is set."""
+    value = os.getenv(name)
+    return _as_path(value) if value else None
+
+
+def _default_output_root() -> Path:
+    return _env_path("OPENICU_YAIB_OUTPUT_ROOT") or (Path.home() / "output" / "openicu_yaib")
+
+
+def _default_concept_root() -> Path:
+    return _env_path("OPENICU_YAIB_CONCEPT_ROOT") or (
+        Path.home() / "output" / "OpenICU.example" / "project" / "workspace" / "concept"
+    )
+
+
+def _default_ricu_concept_dict() -> Path:
+    return _env_path("OPENICU_YAIB_RICU_CONCEPT_DICT") or (
+        Path.home() / "workspace" / "ricu" / "inst" / "extdata" / "config" / "concept-dict.json"
+    )
+
+
+def _default_icustays_csv(dataset: str) -> Path:
+    env_path = _env_path("OPENICU_YAIB_ICUSTAYS_CSV")
+    if env_path is not None:
+        return env_path
+    if dataset in {"mimic-iv", "miiv"}:
+        return Path.home() / "physionet.org" / "files" / "mimiciv" / "3.1" / "icu" / "icustays.csv.gz"
+    raise ValueError(
+        f"No default icustays_csv is known for dataset {dataset!r}; "
+        "pass icustays_csv explicitly or set OPENICU_YAIB_ICUSTAYS_CSV."
+    )
+
 def default_dataset_paths(
     *,
     dataset: str = "mimic-iv",
@@ -104,30 +140,26 @@ def default_dataset_paths(
 ) -> DatasetPaths:
     """Resolve default paths for the simple example notebook.
 
-    The defaults match the original archive notebooks and the shared output
-    folder convention: generated files go below
-    ``~/output/openicu_yaib_converter``.
+    Defaults are intentionally user-neutral and can be overridden either by
+    function arguments or by environment variables:
+
+    - ``OPENICU_YAIB_OUTPUT_ROOT``
+    - ``OPENICU_YAIB_CONCEPT_ROOT``
+    - ``OPENICU_YAIB_ICUSTAYS_CSV``
+    - ``OPENICU_YAIB_RICU_CONCEPT_DICT``
+
+    If these are not set, the function falls back to the local layout used by
+    the example notebooks: generated files go below ``~/output/openicu_yaib``.
     """
     dataset = dataset.lower()
-    out = _as_path(output_root or (Path.home() / "output" / "openicu_yaib_converter"))
-    concept = _as_path(
-        concept_root
-        or (Path.home() / "output" / "OpenICU.example" / "project" / "workspace" / "concept")
+    out = _as_path(output_root) if output_root is not None else _default_output_root()
+    concept = _as_path(concept_root) if concept_root is not None else _default_concept_root()
+    ricu_dict = (
+        _as_path(ricu_concept_dict)
+        if ricu_concept_dict is not None
+        else _default_ricu_concept_dict()
     )
-    ricu_dict = _as_path(
-        ricu_concept_dict
-        or (Path.home() / "workspace" / "ricu" / "inst" / "extdata" / "config" / "concept-dict.json")
-    )
-
-    if icustays_csv is None:
-        if dataset in {"mimic-iv", "miiv"}:
-            icustays = Path.home() / "physionet.org" / "files" / "mimiciv" / "3.1" / "icu" / "icustays.csv.gz"
-        else:
-            raise ValueError(
-                f"No default icustays_csv is known for dataset {dataset!r}; pass icustays_csv explicitly."
-            )
-    else:
-        icustays = Path(icustays_csv)
+    icustays = _as_path(icustays_csv) if icustays_csv is not None else _default_icustays_csv(dataset)
 
     ricu_code = dataset_ricu_code(dataset)
     return DatasetPaths(
@@ -459,6 +491,7 @@ def compare_openicu_wide_to_ricu(
             | pl.col("diff_end").is_null()
             | (pl.col("diff_start") != 0)
             | (pl.col("diff_end") != 0)
+            | (pl.col("diff_n_timepoints") != 0)
         )
         .sort("stay_id")
     )

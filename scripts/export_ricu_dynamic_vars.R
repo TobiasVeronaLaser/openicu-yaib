@@ -1,7 +1,14 @@
 #!/usr/bin/env Rscript
 
 # Export RICU dynamic variables for Python comparison.
-# Output: /home/q039tl/output/openicu_yaib_windows/ricu_dynamic_vars_miiv.parquet by default.
+#
+# Defaults:
+#   RICU_SRC     = miiv
+#   RICU_OUT_DIR = ~/output/openicu_yaib
+#   RICU_DYN_OUT = ${RICU_OUT_DIR}/ricu_dynamic_vars_${RICU_SRC}.parquet
+#
+# Example:
+#   RICU_OUT_DIR="$HOME/output/openicu_yaib" Rscript scripts/export_ricu_dynamic_vars.R
 
 suppressPackageStartupMessages({
   library(ricu)
@@ -10,18 +17,26 @@ suppressPackageStartupMessages({
 })
 
 src <- Sys.getenv("RICU_SRC", unset = "miiv")
-out <- Sys.getenv("RICU_DYN_OUT", unset = "/home/q039tl/output/openicu_yaib_converter/ricu_dynamic_vars_miiv.parquet")
+out_dir <- Sys.getenv(
+  "RICU_OUT_DIR",
+  unset = file.path(Sys.getenv("HOME"), "output", "openicu_yaib")
+)
+out <- Sys.getenv(
+  "RICU_DYN_OUT",
+  unset = file.path(out_dir, sprintf("ricu_dynamic_vars_%s.parquet", src))
+)
+
+dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
 
 dynamic_vars <- c("alb", "alp", "alt", "ast", "be", "bicar", "bili", "bili_dir",
-                  "bnd", "bun", "ca", "cai", "ck", "ckmb", "cl", "crea", "crp", 
+                  "bnd", "bun", "ca", "cai", "ck", "ckmb", "cl", "crea", "crp",
                   "dbp", "fgn", "fio2", "glu", "hgb", "hr", "inr_pt", "k", "lact",
-                  "lymph", "map", "mch", "mchc", "mcv", "methb", "mg", "na", "neut", 
-                  "o2sat", "pco2", "ph", "phos", "plt", "po2", "ptt", "resp", "sbp", 
+                  "lymph", "map", "mch", "mchc", "mcv", "methb", "mg", "na", "neut",
+                  "o2sat", "pco2", "ph", "phos", "plt", "po2", "ptt", "resp", "sbp",
                   "temp", "tnt", "urine", "wbc")
 
 interval <- as.difftime(1, units = "hours")
 df <- load_concepts(dynamic_vars, src = src, interval = interval)
-#df <- load_concepts(dynamic_vars, src = src, interval = hours(1))
 dt <- as.data.table(df)
 
 print(names(dt))
