@@ -1,0 +1,194 @@
+# YAIB unit harmonization registry. Fill with explicit conversions when source units differ.
+unit_mapping:
+  alb:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  alp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  alt:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ast:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  be:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  bicar:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  bili:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  bili_dir:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  bnd:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  bun:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ca:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  cai:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ck:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ckmb:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  cl:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  crea:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  crp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  dbp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  fgn:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  fio2:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  glu:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  hgb:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  hr:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  inr_pt:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  k:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  lact:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  lymph:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  map:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  mch:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  mchc:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  mcv:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  methb:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  mg:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  na:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  neut:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  o2sat:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  pco2:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ph:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  phos:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  plt:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  po2:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  ptt:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  resp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  sbp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  temp:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  tnt:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  urine:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.
+  wbc:
+    conversion: identity
+    note: No explicit conversion configured; existing converter uses numeric_value
+      as provided.

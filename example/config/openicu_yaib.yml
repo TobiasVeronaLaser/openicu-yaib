@@ -1,0 +1,46 @@
+# Example config for converting OpenICU concept parquets to a YAIB-compatible
+# mortality dynamic wide table.
+
+concepts:
+  # Root folder containing OpenICU concept parquet outputs, commonly:
+  # <concept_root>/<concept>/<version>/<dataset>.parquet
+  path: /path/to/openicu/workspace/concept
+  dataset: mimic-iv
+  version: 1.0.0
+
+# Optional. Set to null when concept parquets already contain stay_id, time,
+# and numeric_value. If provided, subject-level concept timestamps are mapped
+# to ICU stays and relative integer hour time is computed.
+icustays_csv: null
+
+# Optional RICU concept-dict.json. Used for RICU min/max filtering and,
+# with aggregation.mode = ricu, concept-specific aggregation metadata.
+ricu_concept_dict: null
+
+yaib:
+  dynamic_vars: ../../configs/mortality_dynamic_vars.yml
+  concept_mapping: ../../configs/concept_mapping.yml
+  unit_mapping: ../../configs/unit_mapping.yml
+
+aggregation:
+  mode: mean
+
+# include_grid=true requires icustays_csv. For already stay/time-indexed
+# concept parquets keep include_grid=false.
+grid:
+  include: false
+  max_hours: 168
+  end_rounding: floor
+
+time:
+  # Output time is YAIB-style integer hours since ICU admission when
+  # icustays_csv is provided; otherwise existing time is assumed to already be
+  # induced integer hours.
+  unit: hours
+  relative_to: icu_intime
+  filter_to_icu_window: true
+
+missing_concepts: warn
+
+output:
+  path: /path/to/output/yaib_mortality_dynamic.parquet
