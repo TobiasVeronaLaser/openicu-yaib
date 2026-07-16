@@ -9,10 +9,9 @@ from the original archive notebooks:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-import os
 
 import polars as pl
 
@@ -74,7 +73,7 @@ class DatasetPaths:
     dataset: str
     output_root: Path
     concept_root: Path
-    icustays_csv: Path
+    icustays_csv: Path | None
     ricu_concept_dict: Path
     ricu_dynamic_path: Path
     ricu_stay_windows_path: Path
@@ -85,7 +84,18 @@ def dataset_ricu_code(dataset: str) -> str:
     mapping = {
         "mimic-iv": "miiv",
         "miiv": "miiv",
+        "mimic": "mimic",
+        "mimic-iii": "mimic",
         "eicu": "eicu",
+        "hirid": "hirid",
+        "aumc": "aumc",
+        "mimic_demo": "mimic_demo",
+        "mimic-demo": "mimic_demo",
+        "eicu_demo": "eicu_demo",
+        "eicu-demo": "eicu_demo",
+        "nwicu": "nwicu",
+        "sic": "sic",
+        "sicdb": "sic",
     }
     key = dataset.lower()
     if key not in mapping:
@@ -119,16 +129,24 @@ def _default_ricu_concept_dict() -> Path:
     )
 
 
-def _default_icustays_csv(dataset: str) -> Path:
+def _default_icustays_csv(dataset: str) -> Path | None:
     env_path = _env_path("OPENICU_YAIB_ICUSTAYS_CSV")
     if env_path is not None:
         return env_path
     if dataset in {"mimic-iv", "miiv"}:
-        return Path.home() / "physionet.org" / "files" / "mimiciv" / "3.1" / "icu" / "icustays.csv.gz"
-    raise ValueError(
-        f"No default icustays_csv is known for dataset {dataset!r}; "
-        "pass icustays_csv explicitly or set OPENICU_YAIB_ICUSTAYS_CSV."
-    )
+        return (
+            Path.home()
+            / "physionet.org"
+            / "files"
+            / "mimiciv"
+            / "3.1"
+            / "icu"
+            / "icustays.csv.gz"
+        )
+    # Other datasets are expected to use OpenICU concept parquets that already
+    # contain stay_id and integer time. A dataset-specific stay table can still
+    # be passed explicitly when it follows the normalized MIMIC-style schema.
+    return None
 
 def default_dataset_paths(
     *,
@@ -159,14 +177,18 @@ def default_dataset_paths(
         if ricu_concept_dict is not None
         else _default_ricu_concept_dict()
     )
-    icustays = _as_path(icustays_csv) if icustays_csv is not None else _default_icustays_csv(dataset)
+    icustays = (
+        _as_path(icustays_csv)
+        if icustays_csv is not None
+        else _default_icustays_csv(dataset)
+    )
 
     ricu_code = dataset_ricu_code(dataset)
     return DatasetPaths(
         dataset=dataset,
         output_root=out,
         concept_root=concept,
-        icustays_csv=_as_path(icustays),
+        icustays_csv=_as_path(icustays) if icustays is not None else None,
         ricu_concept_dict=ricu_dict,
         ricu_dynamic_path=out / f"ricu_dynamic_vars_{ricu_code}.parquet",
         ricu_stay_windows_path=out / f"ricu_stay_windows_{ricu_code}.parquet",
@@ -201,7 +223,7 @@ def _as_path(path: str | Path) -> Path:
 def build_and_write_yaib_wide(
     *,
     concept_root: str | Path,
-    icustays_csv: str | Path,
+    icustays_csv: str | Path | None,
     ricu_concept_dict: str | Path,
     output_path: str | Path,
     dataset: str = "mimic-iv",
@@ -213,6 +235,7 @@ def build_and_write_yaib_wide(
     grid_end_rounding: str = "floor",
     missing_concepts: str = "warn",
     filter_to_icu_window: bool = True,
+    include_grid: bool | None = None,
 ) -> WideExportResult:
     """Build and write YAIB/RICU-style dynamic wide parquet from OpenICU concepts.
 
@@ -224,16 +247,19 @@ def build_and_write_yaib_wide(
     out = _as_path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    resolved_icustays = _as_path(icustays_csv) if icustays_csv is not None else None
+    use_grid = resolved_icustays is not None if include_grid is None else include_grid
+
     lf = build_dynamic_table(
         concept_root=_as_path(concept_root),
-        icustays_csv=_as_path(icustays_csv),
+        icustays_csv=resolved_icustays,
         ricu_concept_dict=_as_path(ricu_concept_dict),
         dataset=dataset,
         version=version,
         dynamic_vars=dynamic_vars or DYNAMIC_VARS,
         concept_mapping=concept_mapping or RICU_TO_OPENICU,
         aggregation_mode=aggregation_mode,  # type: ignore[arg-type]
-        include_grid=True,
+        include_grid=use_grid,
         max_hours=max_hours,
         grid_end_rounding=grid_end_rounding,  # type: ignore[arg-type]
         filter_to_icu_window=filter_to_icu_window,
@@ -267,6 +293,7 @@ def build_and_write_yaib_wide_for_dataset(
     grid_end_rounding: str = "floor",
     missing_concepts: str = "warn",
     filter_to_icu_window: bool = True,
+    include_grid: bool | None = None,
     output_path: str | Path | None = None,
 ) -> WideExportResult:
     """Build and write the standard OpenICU YAIB-wide parquet for a dataset.
@@ -300,6 +327,7 @@ def build_and_write_yaib_wide_for_dataset(
         grid_end_rounding=grid_end_rounding,
         missing_concepts=missing_concepts,
         filter_to_icu_window=filter_to_icu_window,
+        include_grid=include_grid,
     )
 
 

@@ -281,6 +281,8 @@ def build_dynamic_table(
         assert stays is not None
         grid = make_yaib_grid(stays, max_hours=max_hours, end_rounding=grid_end_rounding)
         wide = grid.join(wide, on=["stay_id", "time"], how="left")
+    elif max_hours is not None:
+        wide = wide.filter(pl.col("time") <= max_hours)
 
     present = wide.collect_schema().names()
     ordered_cols = ["stay_id", "time"] + [v for v in vars_ if v in present]

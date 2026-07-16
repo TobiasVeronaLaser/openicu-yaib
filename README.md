@@ -187,3 +187,14 @@ The imported converter logic currently consumes `numeric_value` directly. `confi
 - The default dynamic variable set targets the YAIB ICU mortality use case.
 - The package builds the dynamic wide feature table; it does not yet implement the complete YAIB cohort and label generation pipeline.
 - Exact equality with RICU/YAIB reference outputs can depend on ICU-window filtering, time rounding, grid construction, aggregation mode, and source concept coverage.
+
+## Additional dataset notebooks
+
+Dataset-specific Python notebooks and matching R export wrappers are available in:
+
+```text
+example/datasets/
+scripts/datasets/
+```
+
+They cover eICU, NWICU, HiRID, SICdb, AUMCdb, MIMIC-III, MIMIC demo, and eICU demo. See `example/datasets/README.md` for dataset names, RICU source codes, and limitations. NWICU and SICdb require custom `ricu` source configurations; they are not built-in `ricu` sources.
