@@ -1,29 +1,29 @@
-# Dataset-specific validation notebooks
+# Dataset-specific YAIB validation notebooks
 
-Each notebook follows the same workflow:
+Each notebook follows the same three-stage workflow as
+`example/00_create_yaib_wide_and_compare_ricu.ipynb`:
 
-1. create an all-hours OpenICU YAIB-wide parquet;
-2. create a seven-day validation parquet;
-3. run the matching dataset-specific R script;
-4. compare the OpenICU output with the R/`ricu` reference.
+1. run the matching `scripts/datasets/export_ricu_<source>.R` wrapper;
+2. transform OpenICU `subject_id`, `time`, `numeric_value` concept parquets to YAIB wide format for all hours and for `0..168` hours;
+3. normalize dtypes and compare the 168-hour OpenICU output with RICU.
 
-The notebooks default to `INCLUDE_GRID=False`. Consequently, OpenICU concept parquets must already contain `stay_id`, integer-hour `time`, and `numeric_value`. This is the portable path for datasets whose raw ICU-stay tables do not follow the MIMIC-IV schema.
+The notebooks resolve raw ICU-stay tables from, in order:
 
-| Notebook | OpenICU dataset | RICU source | R support |
-|---|---|---|---|
-| `eicu.ipynb` | `eicu` | `eicu` | built in |
-| `nwicu.ipynb` | `nwicu` | `nwicu` | custom configuration required |
-| `hirid.ipynb` | `hirid` | `hirid` | built in |
-| `sic.ipynb` | `sicdb` | `sic` | custom configuration required |
-| `aumc.ipynb` | `aumc` | `aumc` | built in |
-| `miiv.ipynb` | `mimic-iv` | `miiv` | built in |
-| `mimic.ipynb` | `mimic-iii` | `mimic` | built in |
-| `mimic_demo.ipynb` | `mimic_demo` | `mimic_demo` | demo package required |
-| `eicu_demo.ipynb` | `eicu_demo` | `eicu_demo` | demo package required |
+- `OPENICU_YAIB_<DATASET>_STAYS`;
+- `OPENICU_YAIB_DATA_ROOT`;
+- `RICU_DATA_PATH`;
+- the default local `~/ricu_data` and `~/physionet.org/files` trees.
 
-Run a matching R export from the repository root, for example:
+Dataset mappings are derived from the RICU `id_cfg` definitions:
 
-```bash
-RICU_OUT_DIR="$HOME/output/openicu_yaib/eicu" \
-Rscript scripts/datasets/export_ricu_eicu.R
-```
+- eICU/eICU demo: `patient.csv.gz`, `patientunitstayid`, `unitadmitoffset`, `unitdischargeoffset`;
+- HiRID: `general_table.csv`, `patientid`, `admissiontime`;
+- AUMCdb: `admissions.csv`, `admissionid`, `admittedat`, `dischargedat`;
+- MIMIC-III/demo: `ICUSTAYS.csv.gz`, `SUBJECT_ID`, `ICUSTAY_ID`, `INTIME`, `OUTTIME`;
+- MIMIC-IV: `icustays.csv.gz`, `subject_id`, `stay_id`, `intime`, `outtime`;
+- SICdb: `cases.csv.gz`, `CaseID`, `ICUOffset`, `TimeOfStay`.
+
+NWICU is not present in the supplied standard RICU source configuration. Its
+notebook therefore uses the explicit fallback assumption that OpenICU
+`subject_id` already represents an ICU stay and that `time` is already a
+relative hour value.

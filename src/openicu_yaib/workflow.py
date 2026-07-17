@@ -26,6 +26,7 @@ from .compare import (
 )
 from .concepts import DYNAMIC_VARS, RICU_TO_OPENICU
 from .transform import build_dynamic_table
+from .stays import dataset_stay_spec, find_dataset_stay_file
 
 
 @dataclass(frozen=True)
@@ -133,20 +134,7 @@ def _default_icustays_csv(dataset: str) -> Path | None:
     env_path = _env_path("OPENICU_YAIB_ICUSTAYS_CSV")
     if env_path is not None:
         return env_path
-    if dataset in {"mimic-iv", "miiv"}:
-        return (
-            Path.home()
-            / "physionet.org"
-            / "files"
-            / "mimiciv"
-            / "3.1"
-            / "icu"
-            / "icustays.csv.gz"
-        )
-    # Other datasets are expected to use OpenICU concept parquets that already
-    # contain stay_id and integer time. A dataset-specific stay table can still
-    # be passed explicitly when it follows the normalized MIMIC-style schema.
-    return None
+    return find_dataset_stay_file(dataset)
 
 def default_dataset_paths(
     *,
@@ -224,6 +212,7 @@ def build_and_write_yaib_wide(
     *,
     concept_root: str | Path,
     icustays_csv: str | Path | None,
+    stay_spec=None,
     ricu_concept_dict: str | Path,
     output_path: str | Path,
     dataset: str = "mimic-iv",
@@ -253,6 +242,7 @@ def build_and_write_yaib_wide(
     lf = build_dynamic_table(
         concept_root=_as_path(concept_root),
         icustays_csv=resolved_icustays,
+        stay_spec=stay_spec,
         ricu_concept_dict=_as_path(ricu_concept_dict),
         dataset=dataset,
         version=version,
@@ -313,9 +303,11 @@ def build_and_write_yaib_wide_for_dataset(
         output_root=paths.output_root,
         max_hours=max_hours,
     )
+    spec = dataset_stay_spec(dataset)
     return build_and_write_yaib_wide(
         concept_root=paths.concept_root,
         icustays_csv=paths.icustays_csv,
+        stay_spec=spec,
         ricu_concept_dict=paths.ricu_concept_dict,
         output_path=out,
         dataset=paths.dataset,
