@@ -20,6 +20,8 @@ from .compare import (
     coverage_report,
     key_overlap_report,
     missingness_report,
+    per_stay_reproduction_report,
+    reproduction_accuracy_summary,
     scan_dyn,
     stay_overlap_report,
     table_summary,
@@ -52,6 +54,8 @@ class RICUComparisonResult:
     coverage: pl.DataFrame
     missingness: pl.DataFrame
     value_diff: pl.DataFrame
+    per_stay_reproduction: pl.DataFrame
+    reproduction_accuracy: pl.DataFrame
 
     def as_dict(self) -> dict[str, pl.DataFrame]:
         """Return all report tables as a dictionary for notebook display."""
@@ -64,6 +68,8 @@ class RICUComparisonResult:
             "coverage": self.coverage,
             "missingness": self.missingness,
             "value_diff": self.value_diff,
+            "per_stay_reproduction": self.per_stay_reproduction,
+            "reproduction_accuracy": self.reproduction_accuracy,
         }
 
 
@@ -514,6 +520,8 @@ def compare_openicu_wide_to_ricu(
 
     openicu_lf = openicu.lazy()
     reference_lf = reference.lazy()
+    per_stay = per_stay_reproduction_report(openicu_lf, reference_lf, vars_)
+    accuracy = reproduction_accuracy_summary(per_stay)
     table = pl.concat(
         [table_summary(openicu_lf, "openicu"), table_summary(reference_lf, "ricu_reference")]
     )
@@ -529,6 +537,8 @@ def compare_openicu_wide_to_ricu(
         coverage=coverage_report(openicu_lf, reference_lf, vars_),
         missingness=missingness_report(openicu_lf, reference_lf, vars_),
         value_diff=value_diff_report(openicu_lf, reference_lf, vars_),
+        per_stay_reproduction=per_stay,
+        reproduction_accuracy=accuracy,
     )
 
     if out_dir is not None:
@@ -540,6 +550,8 @@ def compare_openicu_wide_to_ricu(
         result.coverage.write_csv(out_dir / "coverage.csv")
         result.missingness.write_csv(out_dir / "missingness.csv")
         result.value_diff.write_csv(out_dir / "value_diff.csv")
+        result.per_stay_reproduction.write_csv(out_dir / "per_stay_reproduction.csv")
+        result.reproduction_accuracy.write_csv(out_dir / "reproduction_accuracy.csv")
         if write_normalized_reference:
             reference.write_parquet(out_dir / "ricu_reference_normalized.parquet")
             ricu_windows.write_parquet(out_dir / "ricu_windows_normalized.parquet")
@@ -604,4 +616,8 @@ def display_comparison_overview(result: RICUComparisonResult) -> dict[str, pl.Da
         "coverage_by_largest_difference": result.coverage.sort("diff_non_null"),
         "missingness_by_reference_only": result.missingness.sort("only_reference", descending=True),
         "value_diff_by_max_abs_diff": result.value_diff.sort("max_abs_diff", descending=True),
+        "reproduction_accuracy": result.reproduction_accuracy,
+        "non_identical_common_stays_head": result.per_stay_reproduction.filter(
+            pl.col("in_both") & ~pl.col("content_identical")
+        ).head(20),
     }
