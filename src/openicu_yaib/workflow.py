@@ -9,10 +9,9 @@ from the original archive notebooks:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-import os
 
 import polars as pl
 
@@ -20,6 +19,8 @@ from .compare import (
     coverage_report,
     key_overlap_report,
     missingness_report,
+    per_stay_reproduction_report,
+    reproduction_accuracy_summary,
     scan_dyn,
     stay_overlap_report,
     table_summary,
@@ -27,6 +28,7 @@ from .compare import (
 )
 from .concepts import DYNAMIC_VARS, RICU_TO_OPENICU
 from .transform import build_dynamic_table
+from .stays import dataset_stay_spec, find_dataset_stay_file
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,8 @@ class RICUComparisonResult:
     coverage: pl.DataFrame
     missingness: pl.DataFrame
     value_diff: pl.DataFrame
+    per_stay_reproduction: pl.DataFrame
+    reproduction_accuracy: pl.DataFrame
 
     def as_dict(self) -> dict[str, pl.DataFrame]:
         """Return all report tables as a dictionary for notebook display."""
@@ -64,6 +68,8 @@ class RICUComparisonResult:
             "coverage": self.coverage,
             "missingness": self.missingness,
             "value_diff": self.value_diff,
+            "per_stay_reproduction": self.per_stay_reproduction,
+            "reproduction_accuracy": self.reproduction_accuracy,
         }
 
 
@@ -74,7 +80,7 @@ class DatasetPaths:
     dataset: str
     output_root: Path
     concept_root: Path
-    icustays_csv: Path
+    icustays_csv: Path | None
     ricu_concept_dict: Path
     ricu_dynamic_path: Path
     ricu_stay_windows_path: Path
@@ -85,7 +91,20 @@ def dataset_ricu_code(dataset: str) -> str:
     mapping = {
         "mimic-iv": "miiv",
         "miiv": "miiv",
+        "mimic": "mimic",
+        "mimic-iii": "mimic",
+        "mimic-iii-demo": "mimic_demo",
         "eicu": "eicu",
+        "eicu-crd": "eicu",
+        "hirid": "hirid",
+        "aumc": "aumc",
+        "mimic_demo": "mimic_demo",
+        "mimic-demo": "mimic_demo",
+        "eicu_demo": "eicu_demo",
+        "eicu-demo": "eicu_demo",
+        "nwicu": "nwicu",
+        "sic": "sic",
+        "sicdb": "sic",
     }
     key = dataset.lower()
     if key not in mapping:
@@ -119,16 +138,11 @@ def _default_ricu_concept_dict() -> Path:
     )
 
 
-def _default_icustays_csv(dataset: str) -> Path:
+def _default_icustays_csv(dataset: str) -> Path | None:
     env_path = _env_path("OPENICU_YAIB_ICUSTAYS_CSV")
     if env_path is not None:
         return env_path
-    if dataset in {"mimic-iv", "miiv"}:
-        return Path.home() / "physionet.org" / "files" / "mimiciv" / "3.1" / "icu" / "icustays.csv.gz"
-    raise ValueError(
-        f"No default icustays_csv is known for dataset {dataset!r}; "
-        "pass icustays_csv explicitly or set OPENICU_YAIB_ICUSTAYS_CSV."
-    )
+    return find_dataset_stay_file(dataset)
 
 def default_dataset_paths(
     *,
@@ -159,14 +173,18 @@ def default_dataset_paths(
         if ricu_concept_dict is not None
         else _default_ricu_concept_dict()
     )
-    icustays = _as_path(icustays_csv) if icustays_csv is not None else _default_icustays_csv(dataset)
+    icustays = (
+        _as_path(icustays_csv)
+        if icustays_csv is not None
+        else _default_icustays_csv(dataset)
+    )
 
     ricu_code = dataset_ricu_code(dataset)
     return DatasetPaths(
         dataset=dataset,
         output_root=out,
         concept_root=concept,
-        icustays_csv=_as_path(icustays),
+        icustays_csv=_as_path(icustays) if icustays is not None else None,
         ricu_concept_dict=ricu_dict,
         ricu_dynamic_path=out / f"ricu_dynamic_vars_{ricu_code}.parquet",
         ricu_stay_windows_path=out / f"ricu_stay_windows_{ricu_code}.parquet",
@@ -201,7 +219,8 @@ def _as_path(path: str | Path) -> Path:
 def build_and_write_yaib_wide(
     *,
     concept_root: str | Path,
-    icustays_csv: str | Path,
+    icustays_csv: str | Path | None,
+    stay_spec=None,
     ricu_concept_dict: str | Path,
     output_path: str | Path,
     dataset: str = "mimic-iv",
@@ -213,6 +232,7 @@ def build_and_write_yaib_wide(
     grid_end_rounding: str = "floor",
     missing_concepts: str = "warn",
     filter_to_icu_window: bool = True,
+    include_grid: bool | None = None,
 ) -> WideExportResult:
     """Build and write YAIB/RICU-style dynamic wide parquet from OpenICU concepts.
 
@@ -224,16 +244,20 @@ def build_and_write_yaib_wide(
     out = _as_path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    resolved_icustays = _as_path(icustays_csv) if icustays_csv is not None else None
+    use_grid = resolved_icustays is not None if include_grid is None else include_grid
+
     lf = build_dynamic_table(
         concept_root=_as_path(concept_root),
-        icustays_csv=_as_path(icustays_csv),
+        icustays_csv=resolved_icustays,
+        stay_spec=stay_spec,
         ricu_concept_dict=_as_path(ricu_concept_dict),
         dataset=dataset,
         version=version,
         dynamic_vars=dynamic_vars or DYNAMIC_VARS,
         concept_mapping=concept_mapping or RICU_TO_OPENICU,
         aggregation_mode=aggregation_mode,  # type: ignore[arg-type]
-        include_grid=True,
+        include_grid=use_grid,
         max_hours=max_hours,
         grid_end_rounding=grid_end_rounding,  # type: ignore[arg-type]
         filter_to_icu_window=filter_to_icu_window,
@@ -267,6 +291,7 @@ def build_and_write_yaib_wide_for_dataset(
     grid_end_rounding: str = "floor",
     missing_concepts: str = "warn",
     filter_to_icu_window: bool = True,
+    include_grid: bool | None = None,
     output_path: str | Path | None = None,
 ) -> WideExportResult:
     """Build and write the standard OpenICU YAIB-wide parquet for a dataset.
@@ -286,9 +311,11 @@ def build_and_write_yaib_wide_for_dataset(
         output_root=paths.output_root,
         max_hours=max_hours,
     )
+    spec = dataset_stay_spec(dataset)
     return build_and_write_yaib_wide(
         concept_root=paths.concept_root,
         icustays_csv=paths.icustays_csv,
+        stay_spec=spec,
         ricu_concept_dict=paths.ricu_concept_dict,
         output_path=out,
         dataset=paths.dataset,
@@ -300,6 +327,7 @@ def build_and_write_yaib_wide_for_dataset(
         grid_end_rounding=grid_end_rounding,
         missing_concepts=missing_concepts,
         filter_to_icu_window=filter_to_icu_window,
+        include_grid=include_grid,
     )
 
 
@@ -514,6 +542,8 @@ def compare_openicu_wide_to_ricu(
 
     openicu_lf = openicu.lazy()
     reference_lf = reference.lazy()
+    per_stay = per_stay_reproduction_report(openicu_lf, reference_lf, vars_)
+    accuracy = reproduction_accuracy_summary(per_stay)
     table = pl.concat(
         [table_summary(openicu_lf, "openicu"), table_summary(reference_lf, "ricu_reference")]
     )
@@ -529,6 +559,8 @@ def compare_openicu_wide_to_ricu(
         coverage=coverage_report(openicu_lf, reference_lf, vars_),
         missingness=missingness_report(openicu_lf, reference_lf, vars_),
         value_diff=value_diff_report(openicu_lf, reference_lf, vars_),
+        per_stay_reproduction=per_stay,
+        reproduction_accuracy=accuracy,
     )
 
     if out_dir is not None:
@@ -540,6 +572,8 @@ def compare_openicu_wide_to_ricu(
         result.coverage.write_csv(out_dir / "coverage.csv")
         result.missingness.write_csv(out_dir / "missingness.csv")
         result.value_diff.write_csv(out_dir / "value_diff.csv")
+        result.per_stay_reproduction.write_csv(out_dir / "per_stay_reproduction.csv")
+        result.reproduction_accuracy.write_csv(out_dir / "reproduction_accuracy.csv")
         if write_normalized_reference:
             reference.write_parquet(out_dir / "ricu_reference_normalized.parquet")
             ricu_windows.write_parquet(out_dir / "ricu_windows_normalized.parquet")
@@ -604,4 +638,8 @@ def display_comparison_overview(result: RICUComparisonResult) -> dict[str, pl.Da
         "coverage_by_largest_difference": result.coverage.sort("diff_non_null"),
         "missingness_by_reference_only": result.missingness.sort("only_reference", descending=True),
         "value_diff_by_max_abs_diff": result.value_diff.sort("max_abs_diff", descending=True),
+        "reproduction_accuracy": result.reproduction_accuracy,
+        "non_identical_common_stays_head": result.per_stay_reproduction.filter(
+            pl.col("in_both") & ~pl.col("content_identical")
+        ).head(20),
     }

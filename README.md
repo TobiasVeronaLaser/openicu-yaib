@@ -1,27 +1,82 @@
 # openicu-yaib
 
-`openicu-yaib` converts OpenICU concept parquet outputs into a YAIB/RICU-compatible dynamic wide table for the ICU mortality use case.
+`openicu-yaib` converts OpenICU concept outputs to YAIB-style wide tables and, where a matching RICU source exists, produces a bounded 7-day OpenICU↔RICU validation.
 
-The main output has the shape:
+## Dataset workflows
+
+There is exactly one notebook per requested dataset in `example/datasets/`:
+
+- `aumc`
+- `eicu-crd`
+- `eicu-demo`
+- `hirid`
+- `mimic-iii`
+- `mimic-iii-demo`
+- `mimic-iv`
+- `mimic-iv-demo`
+- `nwicu`
+- `sic`
+
+The duplicated `mimic-iii` requirement is represented as `mimic-iii` and `mimic-iii-demo`, matching the existing multi-dataset feature branch and the RICU sources `mimic` / `mimic_demo`.
+
+Every notebook performs the full OpenICU export over **all concept parquet files present for that dataset**. The resulting schema contains one column per discovered OpenICU concept. YAIB's dynamic representation is numeric, so concepts without numeric values remain present as all-null numeric columns rather than being silently omitted. A CSV manifest records every concept parquet used.
+
+For datasets with a RICU source, the notebook additionally:
+
+1. runs the one matching R wrapper from `scripts/datasets/`;
+2. creates the OpenICU YAIB/RICU-compatible 168-hour wide table;
+3. normalizes the RICU wide reference to the same ICU windows;
+4. compares **only the first 7 days (`0..168` hours)** and writes overlap, coverage, missingness, value-difference and reproduction-accuracy inputs/reports.
+
+`mimic-iv-demo` intentionally has no R file and no RICU comparison because there is no corresponding `miiv_demo` source in the configured RICU source set.
+
+RICU source mapping:
+
+| OpenICU dataset | RICU source |
+|---|---|
+| `aumc` | `aumc` |
+| `eicu-crd` | `eicu` |
+| `eicu-demo` | `eicu_demo` |
+| `hirid` | `hirid` |
+| `mimic-iii` | `mimic` |
+| `mimic-iii-demo` | `mimic_demo` |
+| `mimic-iv` | `miiv` |
+| `mimic-iv-demo` | — |
+| `nwicu` | `nwicu` |
+| `sic` | `sic` |
+
+## Output layout
+
+Pass `OPENICU_OUTPUT` in a dataset notebook as either:
+
+- the OpenICU project root (`.../project`),
+- the OpenICU workspace (`.../project/workspace`),
+- the concept directory (`.../project/workspace/concept`), or
+- another output directory.
+
+For an OpenICU project root the package detects `workspace` automatically. The YAIB step is placed next to `extraction`, `concept`, `sharding`, and `persisting`:
 
 ```text
-stay_id | time | alb | alp | alt | ast | ... | wbc
+project/
+  workspace/
+    extraction/
+    concept/
+    sharding/
+    persisting/
+    yaib/
+      eicu-crd/
+        openicu_all_concepts_wide.parquet
+        openicu_all_concepts_wide_concepts.csv
+        openicu_dyn_168h.parquet
+        ricu_dynamic_vars_eicu.parquet
+        ricu_stay_windows_eicu.parquet
+        reports/
+          168h/
+            ricu_reference_normalized.parquet
+            ...csv
 ```
 
-`time` is the YAIB-style integer hour since ICU admission. With an ICU stays table, the converter maps timestamped OpenICU concept rows to ICU stays and aggregates them to an hourly grid. Without an ICU stays table, the concept parquets must already contain `stay_id`, integer `time`, and `numeric_value`.
-
-## Current MVP workflow
-
-The recommended workflow is `example/00_create_yaib_wide_and_compare_ricu.ipynb`. It has four cells:
-
-1. build the OpenICU YAIB/RICU-style wide parquet for all available ICU stay hours (`max_hours=None`);
-2. build a second OpenICU YAIB/RICU-style wide parquet for the first 7 days (`max_hours=7 * 24`, inclusive max time) for validation;
-3. optionally run the R/RICU export scripts;
-4. compare the 7-day generated OpenICU parquet against the R/RICU reference parquet using the same stay-window logic as the working archive notebook.
-
-The all-hours parquet is intended for downstream ML/training. The 7-day parquet is intended for R/RICU validation.
-
-The notebook exposes only the dataset, OpenICU concept version, time horizon, and paths. The creation and comparison logic from the archived notebooks lives in `src/openicu_yaib/workflow.py`.
+For a separate output directory, the same `yaib/<dataset>/...` subtree is created there. By default `concept/` is expected beside `yaib/`; pass `concept_root=` explicitly if the concepts live elsewhere.
 
 ## Install
 
@@ -29,161 +84,39 @@ The notebook exposes only the dataset, OpenICU concept version, time horizon, an
 python -m pip install -e .
 ```
 
-For development:
+Development:
 
 ```bash
 python -m pip install -e ".[dev]"
 pytest -q
 ```
 
-## Path configuration
-
-The simple workflow writes generated files below:
-
-```text
-~/output/openicu_yaib
-```
-
-The notebook can use explicit path variables:
+## Main Python API
 
 ```python
-CONCEPT_ROOT = Path("/path/to/OpenICU/concept/output")
-ICUSTAYS_CSV = Path("/path/to/mimiciv/3.1/icu/icustays.csv.gz")
-RICU_CONCEPT_DICT = Path("/path/to/ricu/inst/extdata/config/concept-dict.json")
-```
+from openicu_yaib import write_all_concepts_wide
 
-Alternatively, set environment variables:
-
-```bash
-export OPENICU_YAIB_OUTPUT_ROOT="$HOME/output/openicu_yaib"
-export OPENICU_YAIB_CONCEPT_ROOT="/path/to/OpenICU/concept/output"
-export OPENICU_YAIB_ICUSTAYS_CSV="/path/to/mimiciv/3.1/icu/icustays.csv.gz"
-export OPENICU_YAIB_RICU_CONCEPT_DICT="/path/to/ricu/inst/extdata/config/concept-dict.json"
-```
-
-The fallback defaults are intentionally lightweight local-layout defaults for the example notebook. In most environments, pass paths explicitly or use the environment variables above.
-
-## R/RICU validation export
-
-For the optional validation step, create the R/RICU reference parquets in the same output directory:
-
-```bash
-RICU_OUT_DIR="$HOME/output/openicu_yaib" Rscript scripts/export_ricu_dynamic_vars.R
-RICU_OUT_DIR="$HOME/output/openicu_yaib" Rscript scripts/export_ricu_stay_windows.R
-```
-
-This writes files such as:
-
-```text
-~/output/openicu_yaib/ricu_dynamic_vars_miiv.parquet
-~/output/openicu_yaib/ricu_stay_windows_miiv.parquet
-```
-
-The comparison uses the same window logic as the working archive notebook: RICU stay windows are converted to integer hours, capped to `MAX_HOURS`, and RICU dynamic rows are filtered to `start <= time <= end`.
-
-## Python usage
-
-Config-first usage:
-
-```python
-from pathlib import Path
-from openicu_yaib import build_mortality_dynamic_wide_from_config
-
-lf = build_mortality_dynamic_wide_from_config(Path("example/config/openicu_yaib.yml"))
-lf.sink_parquet("output/yaib_mortality_dynamic.parquet")
-```
-
-Or write directly from the config:
-
-```python
-from pathlib import Path
-from openicu_yaib import run_from_config
-
-run_from_config(Path("example/config/openicu_yaib.yml"))
-```
-
-Notebook-friendly usage:
-
-```python
-from pathlib import Path
-from openicu_yaib import build_and_write_yaib_wide_for_dataset
-
-result = build_and_write_yaib_wide_for_dataset(
-    dataset="mimic-iv",
-    version="1.0.0",
+result = write_all_concepts_wide(
+    dataset="eicu-crd",
+    openicu_output="/path/to/project/workspace",
     max_hours=None,
-    output_root=Path.home() / "output" / "openicu_yaib",
-    concept_root=Path("/path/to/OpenICU/concept/output"),
-    icustays_csv=Path("/path/to/mimiciv/3.1/icu/icustays.csv.gz"),
-    ricu_concept_dict=Path("/path/to/ricu/inst/extdata/config/concept-dict.json"),
 )
 ```
 
-## CLI usage
-
-Preferred config-first mode:
-
-```bash
-openicu-yaib --config example/config/openicu_yaib.yml
-```
-
-Direct-argument mode is also available:
-
-```bash
-openicu-yaib \
-  --concept-root /path/to/openicu/workspace/concept \
-  --dataset mimic-iv \
-  --version 1.0.0 \
-  --no-grid \
-  --output /path/to/output/yaib_mortality_dynamic.parquet
-```
-
-For subject-level timestamped concept parquets, provide ICU stays and enable the grid if desired:
-
-```bash
-openicu-yaib \
-  --concept-root /path/to/openicu/workspace/concept \
-  --icustays-csv /path/to/mimiciv/3.1/icu/icustays.csv.gz \
-  --ricu-concept-dict /path/to/ricu/inst/extdata/config/concept-dict.json \
-  --dataset mimic-iv \
-  --version 1.0.0 \
-  --aggregation-mode mean \
-  --grid-end-rounding floor \
-  --output /path/to/output/yaib_mortality_dynamic.parquet
-```
+For the RICU-compatible 7-day subset, the dataset notebooks call the existing `build_and_write_yaib_wide_for_dataset(...)` and `compare_openicu_wide_to_ricu_for_dataset(...)` workflows. The original reproduction-accuracy metrics from the feature branch are retained in `openicu_yaib.compare`.
 
 ## Repository layout
 
 ```text
-configs/
-  mortality_dynamic_vars.yml   # mortality dynamic variable set
-  concept_mapping.yml          # YAIB/RICU name -> OpenICU concept name
-  unit_mapping.yml             # extension point for explicit unit conversion
-example/
-  config/openicu_yaib.yml
-  00_create_yaib_wide_and_compare_ricu.ipynb
-scripts/
-  export_ricu_dynamic_vars.R
-  export_ricu_stay_windows.R
+configs/                     # RICU/YAIB concept + unit mappings
+example/datasets/            # exactly one .ipynb per dataset
+scripts/datasets/            # one .R wrapper per RICU-backed dataset
+scripts/                     # shared R export implementation
 src/openicu_yaib/
-  config.py
-  pipeline.py
-  concepts.py
-  io.py
-  transform.py
-  validation.py
-  compare.py
-  workflow.py
-  ricu_meta.py
-  cli.py
+  all_concepts.py             # all-OpenICU-concept wide export + output placement
+  datasets.py                 # canonical dataset/RICU registry
+  stays.py                    # dataset-specific stay table discovery/mapping
+  transform.py                # YAIB/RICU-compatible dynamic transform
+  compare.py                  # overlap/difference/reproduction metrics
+  workflow.py                 # notebook-friendly 7-day validation workflow
 ```
-
-## Notes on units
-
-The imported converter logic currently consumes `numeric_value` directly. `configs/unit_mapping.yml` is included as the explicit place to define YAIB unit harmonization rules when OpenICU concept outputs expose units that need conversion.
-
-## Current limitations
-
-- The default dynamic variable set targets the YAIB ICU mortality use case.
-- The package builds the dynamic wide feature table; it does not yet implement the complete YAIB cohort and label generation pipeline.
-- Exact equality with RICU/YAIB reference outputs can depend on ICU-window filtering, time rounding, grid construction, aggregation mode, and source concept coverage.

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openicu-yaib"
 version = "0.1.0"
-description = "Convert OpenICU concept parquets to YAIB-compatible mortality dynamic wide tables."
+description = "Convert OpenICU concept outputs to YAIB-wide tables and validate against RICU."
 authors = [{ name = "OpenICU contributors" }]
 license = { file = "LICENSE" }
 keywords = ["OpenICU", "YAIB", "RICU", "ICU", "MIMIC-IV", "critical-care"]
