@@ -400,7 +400,9 @@ def read_ricu_stay_windows(path: str | Path, *, max_hours: int | None = 168) -> 
 
     if max_hours is not None:
         windows = windows.with_columns(
-            pl.min_horizontal(pl.col("ricu_end"), pl.lit(max_hours)).alias("ricu_end")
+            pl.col("ricu_end")
+            .clip(upper_bound=max_hours)
+            .alias("ricu_end")
         )
 
     return windows.with_columns(
@@ -491,16 +493,40 @@ def compare_openicu_wide_to_ricu(
         openicu = openicu.filter(pl.col("time") <= max_hours)
 
     openicu_windows = stay_windows_from_wide(openicu, prefix="openicu")
-    ricu_windows = read_ricu_stay_windows(ricu_stay_windows_path, max_hours=max_hours)
+
+    ricu_windows = read_ricu_stay_windows(
+        ricu_stay_windows_path,
+        max_hours=max_hours,
+    )
+
+    valid_metric_stays = (
+        ricu_windows
+        .filter(pl.col("ricu_end").is_not_null())
+        .select("stay_id")
+    )
+
     reference = normalize_ricu_dynamic_reference(
         reference_dynamic_path=reference_path,
         ricu_windows=ricu_windows,
         openicu_columns=openicu.columns,
     )
+
     reference = normalize_wide_dtypes_for_comparison(
         reference,
         columns=openicu.columns,
         dynamic_vars=vars_,
+    )
+
+    openicu_metric = openicu.join(
+        valid_metric_stays,
+        on="stay_id",
+        how="semi",
+    )
+
+    reference_metric = reference.join(
+        valid_metric_stays,
+        on="stay_id",
+        how="semi",
     )
 
     window_differences = (
@@ -537,11 +563,12 @@ def compare_openicu_wide_to_ricu(
             (pl.col("openicu_end") - pl.col("ricu_end")).min().alias("min_diff_end"),
             (pl.col("openicu_end") - pl.col("ricu_end")).max().alias("max_diff_end"),
             (pl.col("openicu_end") - pl.col("ricu_end")).mean().alias("mean_diff_end"),
+            pl.col("ricu_end").is_null().sum().alias("n_excluded_metric_null_ricu_end"),
         ]
     )
 
-    openicu_lf = openicu.lazy()
-    reference_lf = reference.lazy()
+    openicu_lf = openicu_metric.lazy()
+    reference_lf = reference_metric.lazy()
     per_stay = per_stay_reproduction_report(openicu_lf, reference_lf, vars_)
     accuracy = reproduction_accuracy_summary(per_stay)
     table = pl.concat(
