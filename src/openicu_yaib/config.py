@@ -21,7 +21,7 @@ class OpenICUYAIBConfig:
     dynamic_vars: list[str] | None = None
     concept_mapping: dict[str, str] | None = None
     unit_mapping: dict[str, Any] | None = None
-    aggregation_mode: str = "mean"
+    aggregation_mode: str = "ricu"
     include_grid: bool = False
     max_hours: int | None = 168
     grid_end_rounding: str = "floor"
@@ -114,7 +114,7 @@ def load_config(path: str | Path) -> OpenICUYAIBConfig:
         dynamic_vars=_load_dynamic_vars(dynamic_vars_path),
         concept_mapping=_load_concept_mapping(concept_mapping_path),
         unit_mapping=_load_unit_mapping(unit_mapping_path),
-        aggregation_mode=str(aggregation.get("mode", "mean")),
+        aggregation_mode=str(aggregation.get("mode", "ricu")),
         include_grid=bool(grid.get("include", False)),
         max_hours=max_hours,
         grid_end_rounding=str(grid.get("end_rounding", "floor")),

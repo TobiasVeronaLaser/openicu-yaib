@@ -8,7 +8,10 @@ from pathlib import Path
 
 import polars as pl
 
+from .aggregation import uses_ricu_aggregation
+from .concepts import RICU_TO_OPENICU
 from .io import scan_dataset_stays, scan_openicu_subject_concept_hours
+from .ricu_meta import RicuConceptMeta
 from .stays import dataset_stay_spec, find_dataset_stay_file
 
 
@@ -112,6 +115,45 @@ def _grid_from_normalized_stays(stays: pl.LazyFrame, max_hours: int | None) -> p
     )
 
 
+
+# Additional RICU concepts that are not part of the standard dynamic-variable
+# mapping but do have relevant hourly aggregation metadata.
+_RICU_AGGREGATION_TO_OPENICU = {
+    **RICU_TO_OPENICU,
+    "dobu_dur": "dobutamine_duration",
+    "dopa_dur": "dopamine_duration",
+    "epi_dur": "epinephrine_duration",
+    "norepi_dur": "norepinephrine_duration",
+}
+
+_OPENICU_TO_RICU_AGGREGATION = {
+    openicu_name: ricu_name
+    for ricu_name, openicu_name in _RICU_AGGREGATION_TO_OPENICU.items()
+}
+
+
+def _aggregate_expr(column: str, aggregate: str) -> pl.Expr:
+    """Aggregate one hourly concept, defaulting to mean semantics."""
+    aggregate = aggregate.lower()
+
+    if aggregate == "mean":
+        return pl.col(column).mean()
+    if aggregate == "median":
+        return pl.col(column).median()
+    if aggregate == "sum":
+        return pl.col(column).sum()
+    if aggregate == "min":
+        return pl.col(column).min()
+    if aggregate == "max":
+        return pl.col(column).max()
+    if aggregate == "first":
+        return pl.col(column).first()
+    if aggregate == "last":
+        return pl.col(column).last()
+
+    raise ValueError(f"Unsupported aggregation: {aggregate!r}")
+
+
 def _concept_table(
     item: ConceptFile,
     *,
@@ -119,6 +161,7 @@ def _concept_table(
     subject_is_stay: bool,
     numeric_time_scale_hours: float,
     max_hours: int | None,
+    ricu_meta: RicuConceptMeta | None,
 ) -> pl.LazyFrame:
     events = scan_openicu_subject_concept_hours(
         item.path, numeric_scale_hours=numeric_time_scale_hours
@@ -130,7 +173,7 @@ def _concept_table(
             )
         mapped = events.with_columns(
             pl.col("subject_id").alias("stay_id"),
-            pl.col("time_hours").round(0).cast(pl.Int64).alias("time"),
+            pl.col("time_hours").floor().cast(pl.Int64).alias("time"),
         )
     else:
         mapped = (
@@ -144,7 +187,7 @@ def _concept_table(
             )
             .with_columns(
                 (pl.col("time_hours") - pl.col("intime_hours"))
-                .round(0)
+                .floor()
                 .cast(pl.Int64)
                 .alias("time")
             )
@@ -152,9 +195,16 @@ def _concept_table(
     mapped = mapped.filter(pl.col("time") >= 0)
     if max_hours is not None:
         mapped = mapped.filter(pl.col("time") <= max_hours)
+    ricu_name = _OPENICU_TO_RICU_AGGREGATION.get(item.name)
+    aggregate = (
+        ricu_meta.aggregate_for(ricu_name, default="mean")
+        if ricu_meta is not None and ricu_name is not None
+        else "mean"
+    )
+
     return (
         mapped.group_by("stay_id", "time")
-        .agg(pl.col("numeric_value").mean().alias(item.name))
+        .agg(_aggregate_expr("numeric_value", aggregate).alias(item.name))
         .select("stay_id", "time", item.name)
     )
 
@@ -166,6 +216,7 @@ def build_all_concepts_wide(
     stays_path: str | Path | None = None,
     max_hours: int | None = None,
     include_grid: bool = True,
+    ricu_concept_dict: str | Path | None = None,
 ) -> tuple[pl.LazyFrame, list[ConceptFile]]:
     """Build a numeric YAIB-wide table from every available OpenICU concept.
 
@@ -181,6 +232,11 @@ def build_all_concepts_wide(
         )
 
     spec = dataset_stay_spec(dataset)
+    ricu_meta = (
+        RicuConceptMeta.from_json(ricu_concept_dict)
+        if ricu_concept_dict is not None and uses_ricu_aggregation(dataset)
+        else None
+    )
     resolved_stays = Path(stays_path).expanduser().resolve() if stays_path else find_dataset_stay_file(dataset)
     stays = scan_dataset_stays(resolved_stays, spec) if resolved_stays is not None else None
 
@@ -191,6 +247,7 @@ def build_all_concepts_wide(
             subject_is_stay=spec.subject_is_stay,
             numeric_time_scale_hours=spec.numeric_time_scale_hours,
             max_hours=max_hours,
+            ricu_meta=ricu_meta,
         )
         for item in concepts
     ]
@@ -221,11 +278,21 @@ def write_all_concepts_wide(
     max_hours: int | None = None,
     include_grid: bool = True,
     output_name: str | None = None,
+    output_root: str | Path | None = None,
+    ricu_concept_dict: str | Path | None = None,
 ) -> AllConceptsExportResult:
-    """Write the full-concept wide parquet under ``<workspace>/yaib/<dataset>``."""
+    """Write the full-concept wide parquet.
+
+    By default, output is written under ``<workspace>/yaib/<dataset>``.
+    If ``output_root`` is provided, that directory is used instead.
+    """
     workspace = resolve_openicu_workspace(openicu_output)
     croot = Path(concept_root).expanduser().resolve() if concept_root else concept_root_from_output(openicu_output)
-    dataset_dir = workspace / "yaib" / dataset
+
+    if output_root is None:
+        dataset_dir = workspace / "yaib" / dataset
+    else:
+        dataset_dir = Path(output_root).expanduser().resolve()
     dataset_dir.mkdir(parents=True, exist_ok=True)
     name = output_name or ("openicu_all_concepts_wide.parquet" if max_hours is None else f"openicu_all_concepts_wide_{max_hours}h.parquet")
     out = dataset_dir / name
@@ -237,6 +304,7 @@ def write_all_concepts_wide(
         stays_path=stays_path,
         max_hours=max_hours,
         include_grid=include_grid,
+        ricu_concept_dict=ricu_concept_dict,
     )
     wide.sink_parquet(out)
     pl.DataFrame(

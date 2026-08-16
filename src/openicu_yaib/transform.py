@@ -65,7 +65,7 @@ def map_events_to_stays(
 
     If ``filter_to_icu_window`` is true, an event is assigned to a stay iff
     ``event.time >= intime`` and ``event.time <= outtime``. The output time is
-    the rounded number of hours since ICU admission.
+    the floored number of hours since ICU admission.
     """
     mapped = events.join(stays, on="subject_id", how="inner")
 
@@ -84,7 +84,7 @@ def map_events_to_stays(
                 / 3600.0
             ).alias("diff_hours")
         )
-        .with_columns(pl.col("diff_hours").round(0).cast(pl.Int64).alias("time"))
+        .with_columns(pl.col("diff_hours").floor().cast(pl.Int64).alias("time"))
         .filter(pl.col("time") >= 0)
         .select("stay_id", "time", "numeric_value")
     )
@@ -111,7 +111,7 @@ def map_subject_events_to_dataset_stays(
     return (
         mapped.with_columns(
             (pl.col("time_hours") - pl.col("intime_hours"))
-            .round(0)
+            .floor()
             .cast(pl.Int64)
             .alias("time")
         )
@@ -127,7 +127,7 @@ def aggregate_dataset_concept_hourly(
     stay_spec: DatasetStaySpec,
     ricu_name: str,
     ricu_meta: RicuConceptMeta,
-    aggregation_mode: AggregationMode = "mean",
+    aggregation_mode: AggregationMode = "ricu",
     filter_to_icu_window: bool = True,
 ) -> pl.LazyFrame:
     """Load and aggregate one concept using a dataset-specific stay definition."""
@@ -151,7 +151,7 @@ def aggregate_concept_hourly(
     stays: pl.LazyFrame,
     ricu_name: str,
     ricu_meta: RicuConceptMeta,
-    aggregation_mode: AggregationMode = "mean",
+    aggregation_mode: AggregationMode = "ricu",
     filter_to_icu_window: bool = True,
 ) -> pl.LazyFrame:
     """Load, range-filter, stay-map and aggregate one dynamic concept."""
@@ -175,7 +175,7 @@ def aggregate_identity_concept_hourly(
     stay_spec: DatasetStaySpec,
     ricu_name: str,
     ricu_meta: RicuConceptMeta,
-    aggregation_mode: AggregationMode = "mean",
+    aggregation_mode: AggregationMode = "ricu",
 ) -> pl.LazyFrame:
     """Treat OpenICU subject_id as the ICU stay ID and time as relative hours."""
     events = scan_openicu_subject_concept_hours(
@@ -185,7 +185,7 @@ def aggregate_identity_concept_hourly(
     return (
         events.with_columns(
             pl.col("subject_id").alias("stay_id"),
-            pl.col("time_hours").round(0).cast(pl.Int64).alias("time"),
+            pl.col("time_hours").floor().cast(pl.Int64).alias("time"),
         )
         .filter(pl.col("time") >= 0)
         .group_by("stay_id", "time")
@@ -199,7 +199,7 @@ def aggregate_dynamic_concept_hourly(
     concept_file: str | Path,
     ricu_name: str,
     ricu_meta: RicuConceptMeta,
-    aggregation_mode: AggregationMode = "mean",
+    aggregation_mode: AggregationMode = "ricu",
 ) -> pl.LazyFrame:
     """Load, range-filter and aggregate one already stay/time-indexed dynamic concept.
 
@@ -289,7 +289,7 @@ def build_dynamic_table(
     version: str | None = None,
     dynamic_vars: list[str] | None = None,
     concept_mapping: dict[str, str] | None = None,
-    aggregation_mode: AggregationMode = "mean",
+    aggregation_mode: AggregationMode = "ricu",
     include_grid: bool = True,
     max_hours: int | None = 168,
     grid_end_rounding: GridEndRounding = "floor",

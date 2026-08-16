@@ -35,7 +35,8 @@ _SPECS = {
     "aumc": DatasetStaySpec("aumc", ("admissions.csv",), "admissionid", "admissionid", "admittedat", "dischargedat", 1 / 3_600_000, True),
     "sicdb": DatasetStaySpec("sicdb", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True),
     "sic": DatasetStaySpec("sic", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True),
-    # NWICU can be supplied through a custom RICU source configuration.
+    # NWICU is not a native RICU source; RICU metadata may still be used
+    # independently for YAIB aggregation semantics.
     # Without a raw stay table, OpenICU subject_id is treated as the ICU stay ID.
     "nwicu": DatasetStaySpec("nwicu", (), "subject_id", "subject_id", None, None, 1.0, True),
 }

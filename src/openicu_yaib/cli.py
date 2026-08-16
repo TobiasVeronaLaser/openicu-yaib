@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--ricu-concept-dict", default=None, help="RICU concept-dict.json path")
     parser.add_argument("--dataset", default="mimic-iv")
     parser.add_argument("--version", default="1.0.0")
-    parser.add_argument("--aggregation-mode", choices=["mean", "ricu"], default="mean")
+    parser.add_argument("--aggregation-mode", choices=["mean", "ricu"], default="ricu")
     parser.add_argument("--output", help="Output parquet path")
     parser.add_argument("--max-hours", type=int, default=168, help="Maximum grid hour. Use -1 to disable cap.")
     parser.add_argument("--grid-end-rounding", choices=["floor", "ceil"], default="floor")

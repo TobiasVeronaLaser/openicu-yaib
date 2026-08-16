@@ -62,24 +62,12 @@ class RicuConceptMeta:
         return self._find_numeric_meta(name, "min"), self._find_numeric_meta(name, "max")
 
     def aggregate_for(self, name: str, default: str = "mean") -> str:
-        """Return configured RICU aggregation, if available."""
+        """Return the concept-level RICU aggregation, if available."""
         obj = self.concept(name)
 
-        def walk(x: Any) -> str | None:
-            if isinstance(x, dict):
-                for key in ("aggregate", "aggregation", "fun"):
-                    value = x.get(key)
-                    if isinstance(value, str):
-                        return value
-                for child in x.values():
-                    found = walk(child)
-                    if found is not None:
-                        return found
-            elif isinstance(x, list):
-                for child in x:
-                    found = walk(child)
-                    if found is not None:
-                        return found
-            return None
+        for key in ("aggregate", "aggregation", "fun"):
+            value = obj.get(key)
+            if isinstance(value, str):
+                return value
 
-        return walk(obj) or default
+        return default
