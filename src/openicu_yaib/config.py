@@ -21,7 +21,7 @@ class OpenICUYAIBConfig:
     dynamic_vars: list[str] | None = None
     concept_mapping: dict[str, str] | None = None
     unit_mapping: dict[str, Any] | None = None
-    aggregation_mode: str = "mean"
+    aggregation_mode: str = "ricu"
     include_grid: bool = False
     max_hours: int | None = 168
     grid_end_rounding: str = "floor"
@@ -51,7 +51,9 @@ def _load_dynamic_vars(path: Path | None) -> list[str] | None:
     data = _read_yaml(path)
     values = data.get("dynamic_vars") or data.get("mortality_dynamic_vars")
     if not isinstance(values, list) or not all(isinstance(x, str) for x in values):
-        raise ValueError(f"Dynamic vars YAML must contain a string list under 'dynamic_vars': {path}")
+        raise ValueError(
+            f"Dynamic vars YAML must contain a string list under 'dynamic_vars': {path}"
+        )
     return values
 
 
@@ -60,7 +62,9 @@ def _load_concept_mapping(path: Path | None) -> dict[str, str] | None:
         return None
     data = _read_yaml(path)
     mapping = data.get("concept_mapping", data)
-    if not isinstance(mapping, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()):
+    if not isinstance(mapping, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
+    ):
         raise ValueError(f"Concept mapping YAML must contain string-to-string mapping: {path}")
     return dict(mapping)
 
@@ -114,7 +118,7 @@ def load_config(path: str | Path) -> OpenICUYAIBConfig:
         dynamic_vars=_load_dynamic_vars(dynamic_vars_path),
         concept_mapping=_load_concept_mapping(concept_mapping_path),
         unit_mapping=_load_unit_mapping(unit_mapping_path),
-        aggregation_mode=str(aggregation.get("mode", "mean")),
+        aggregation_mode=str(aggregation.get("mode", "ricu")),
         include_grid=bool(grid.get("include", False)),
         max_hours=max_hours,
         grid_end_rounding=str(grid.get("end_rounding", "floor")),

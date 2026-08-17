@@ -11,22 +11,40 @@ from .transform import write_dynamic_table
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Build a YAIB-compatible mortality dynamic wide table from OpenICU concept parquets."
+        description=(
+            "Build a YAIB-compatible mortality dynamic wide table "
+            "from OpenICU concept parquets."
+        )
     )
     parser.add_argument("--config", help="Path to openicu_yaib.yml. Preferred config-first mode.")
 
     # Legacy direct-argument mode kept from the converter project.
-    parser.add_argument("--concept-root", help="OpenICU concept output root, e.g. workspace/concept")
-    parser.add_argument("--icustays-csv", help="MIMIC-IV icustays.csv.gz path. Omit for already stay/time-indexed parquets.")
+    parser.add_argument(
+        "--concept-root", help="OpenICU concept output root, e.g. workspace/concept"
+    )
+    parser.add_argument(
+        "--icustays-csv",
+        help="MIMIC-IV icustays.csv.gz path. Omit for already stay/time-indexed parquets.",
+    )
     parser.add_argument("--ricu-concept-dict", default=None, help="RICU concept-dict.json path")
     parser.add_argument("--dataset", default="mimic-iv")
     parser.add_argument("--version", default="1.0.0")
-    parser.add_argument("--aggregation-mode", choices=["mean", "ricu"], default="mean")
+    parser.add_argument("--aggregation-mode", choices=["mean", "ricu"], default="ricu")
     parser.add_argument("--output", help="Output parquet path")
-    parser.add_argument("--max-hours", type=int, default=168, help="Maximum grid hour. Use -1 to disable cap.")
+    parser.add_argument(
+        "--max-hours", type=int, default=168, help="Maximum grid hour. Use -1 to disable cap."
+    )
     parser.add_argument("--grid-end-rounding", choices=["floor", "ceil"], default="floor")
-    parser.add_argument("--no-grid", action="store_true", help="Do not add complete stay/hour grid; keep observed concept keys only.")
-    parser.add_argument("--no-icu-window-filter", action="store_true", help="Do not require concept event timestamp to be inside intime/outtime.")
+    parser.add_argument(
+        "--no-grid",
+        action="store_true",
+        help="Do not add complete stay/hour grid; keep observed concept keys only.",
+    )
+    parser.add_argument(
+        "--no-icu-window-filter",
+        action="store_true",
+        help="Do not require concept event timestamp to be inside intime/outtime.",
+    )
     parser.add_argument("--missing-concepts", choices=["warn", "fail", "ignore"], default="warn")
     args = parser.parse_args(argv)
 
