@@ -51,7 +51,9 @@ def _load_dynamic_vars(path: Path | None) -> list[str] | None:
     data = _read_yaml(path)
     values = data.get("dynamic_vars") or data.get("mortality_dynamic_vars")
     if not isinstance(values, list) or not all(isinstance(x, str) for x in values):
-        raise ValueError(f"Dynamic vars YAML must contain a string list under 'dynamic_vars': {path}")
+        raise ValueError(
+            f"Dynamic vars YAML must contain a string list under 'dynamic_vars': {path}"
+        )
     return values
 
 
@@ -60,7 +62,9 @@ def _load_concept_mapping(path: Path | None) -> dict[str, str] | None:
         return None
     data = _read_yaml(path)
     mapping = data.get("concept_mapping", data)
-    if not isinstance(mapping, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()):
+    if not isinstance(mapping, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
+    ):
         raise ValueError(f"Concept mapping YAML must contain string-to-string mapping: {path}")
     return dict(mapping)
 

@@ -28,7 +28,7 @@ For datasets with a RICU source, the notebook additionally:
 3. normalizes the RICU wide reference to the same ICU windows;
 4. compares **only the first 7 days (`0..168` hours)** and writes overlap, coverage, missingness, value-difference and reproduction-accuracy inputs/reports.
 
-`mimic-iv-demo` intentionally has no R file and no RICU comparison because there is no corresponding `miiv_demo` source in the configured RICU source set.
+`mimic-iv-demo` and `nwicu` intentionally have no R file and no RICU comparison because they have no corresponding native source in the configured RICU source set.
 
 RICU source mapping:
 
@@ -42,7 +42,7 @@ RICU source mapping:
 | `mimic-iii-demo` | `mimic_demo` |
 | `mimic-iv` | `miiv` |
 | `mimic-iv-demo` | — |
-| `nwicu` | `nwicu` |
+| `nwicu` | — |
 | `sic` | `sic` |
 
 ## Output layout

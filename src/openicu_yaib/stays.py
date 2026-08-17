@@ -20,21 +20,106 @@ class DatasetStaySpec:
 
 
 _SPECS = {
-    "mimic-iv": DatasetStaySpec("mimic-iv", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"),
-    "miiv": DatasetStaySpec("miiv", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"),
-    "mimic-iii": DatasetStaySpec("mimic-iii", ("ICUSTAYS.csv.gz", "icustays.csv.gz"), "SUBJECT_ID", "ICUSTAY_ID", "INTIME", "OUTTIME"),
-    "mimic": DatasetStaySpec("mimic", ("ICUSTAYS.csv.gz", "icustays.csv.gz"), "SUBJECT_ID", "ICUSTAY_ID", "INTIME", "OUTTIME"),
-    "mimic_demo": DatasetStaySpec("mimic_demo", ("ICUSTAYS.csv.gz", "icustays.csv.gz"), "SUBJECT_ID", "ICUSTAY_ID", "INTIME", "OUTTIME"),
-    "mimic-iii-demo": DatasetStaySpec("mimic-iii-demo", ("ICUSTAYS.csv.gz", "icustays.csv.gz"), "SUBJECT_ID", "ICUSTAY_ID", "INTIME", "OUTTIME"),
-    "mimic-iv-demo": DatasetStaySpec("mimic-iv-demo", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"),
-    "eicu": DatasetStaySpec("eicu", ("patient.csv.gz",), "patienthealthsystemstayid", "patientunitstayid", None, "unitdischargeoffset", 1 / 60, False),
-    "eicu_demo": DatasetStaySpec("eicu_demo", ("patient.csv.gz",), "patienthealthsystemstayid", "patientunitstayid", None, "unitdischargeoffset", 1 / 60, False),
-    "eicu-crd": DatasetStaySpec("eicu-crd", ("patient.csv.gz",), "patienthealthsystemstayid", "patientunitstayid", None, "unitdischargeoffset", 1 / 60, False),
-    "eicu-demo": DatasetStaySpec("eicu-demo", ("patient.csv.gz",), "patienthealthsystemstayid", "patientunitstayid", None, "unitdischargeoffset", 1 / 60, False),
-    "hirid": DatasetStaySpec("hirid", ("general_table.csv",), "patientid", "patientid", "admissiontime", None, 1.0, True),
-    "aumc": DatasetStaySpec("aumc", ("admissions.csv",), "admissionid", "admissionid", "admittedat", "dischargedat", 1 / 3_600_000, True),
-    "sicdb": DatasetStaySpec("sicdb", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True),
-    "sic": DatasetStaySpec("sic", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True),
+    "mimic-iv": DatasetStaySpec(
+        "mimic-iv", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"
+    ),
+    "miiv": DatasetStaySpec(
+        "miiv", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"
+    ),
+    "mimic-iii": DatasetStaySpec(
+        "mimic-iii",
+        ("ICUSTAYS.csv.gz", "icustays.csv.gz"),
+        "SUBJECT_ID",
+        "ICUSTAY_ID",
+        "INTIME",
+        "OUTTIME",
+    ),
+    "mimic": DatasetStaySpec(
+        "mimic",
+        ("ICUSTAYS.csv.gz", "icustays.csv.gz"),
+        "SUBJECT_ID",
+        "ICUSTAY_ID",
+        "INTIME",
+        "OUTTIME",
+    ),
+    "mimic_demo": DatasetStaySpec(
+        "mimic_demo",
+        ("ICUSTAYS.csv.gz", "icustays.csv.gz"),
+        "SUBJECT_ID",
+        "ICUSTAY_ID",
+        "INTIME",
+        "OUTTIME",
+    ),
+    "mimic-iii-demo": DatasetStaySpec(
+        "mimic-iii-demo",
+        ("ICUSTAYS.csv.gz", "icustays.csv.gz"),
+        "SUBJECT_ID",
+        "ICUSTAY_ID",
+        "INTIME",
+        "OUTTIME",
+    ),
+    "mimic-iv-demo": DatasetStaySpec(
+        "mimic-iv-demo", ("icustays.csv.gz",), "subject_id", "stay_id", "intime", "outtime"
+    ),
+    "eicu": DatasetStaySpec(
+        "eicu",
+        ("patient.csv.gz",),
+        "patienthealthsystemstayid",
+        "patientunitstayid",
+        None,
+        "unitdischargeoffset",
+        1 / 60,
+        False,
+    ),
+    "eicu_demo": DatasetStaySpec(
+        "eicu_demo",
+        ("patient.csv.gz",),
+        "patienthealthsystemstayid",
+        "patientunitstayid",
+        None,
+        "unitdischargeoffset",
+        1 / 60,
+        False,
+    ),
+    "eicu-crd": DatasetStaySpec(
+        "eicu-crd",
+        ("patient.csv.gz",),
+        "patienthealthsystemstayid",
+        "patientunitstayid",
+        None,
+        "unitdischargeoffset",
+        1 / 60,
+        False,
+    ),
+    "eicu-demo": DatasetStaySpec(
+        "eicu-demo",
+        ("patient.csv.gz",),
+        "patienthealthsystemstayid",
+        "patientunitstayid",
+        None,
+        "unitdischargeoffset",
+        1 / 60,
+        False,
+    ),
+    "hirid": DatasetStaySpec(
+        "hirid", ("general_table.csv",), "patientid", "patientid", "admissiontime", None, 1.0, True
+    ),
+    "aumc": DatasetStaySpec(
+        "aumc",
+        ("admissions.csv",),
+        "admissionid",
+        "admissionid",
+        "admittedat",
+        "dischargedat",
+        1 / 3_600_000,
+        True,
+    ),
+    "sicdb": DatasetStaySpec(
+        "sicdb", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True
+    ),
+    "sic": DatasetStaySpec(
+        "sic", ("cases.csv.gz",), "CaseID", "CaseID", "ICUOffset", "TimeOfStay", 1 / 60, True
+    ),
     # NWICU is not a native RICU source; RICU metadata may still be used
     # independently for YAIB aggregation semantics.
     # Without a raw stay table, OpenICU subject_id is treated as the ICU stay ID.

@@ -27,8 +27,8 @@ from .compare import (
     value_diff_report,
 )
 from .concepts import DYNAMIC_VARS, RICU_TO_OPENICU
-from .transform import build_dynamic_table
 from .stays import dataset_stay_spec, find_dataset_stay_file
+from .transform import build_dynamic_table
 
 
 @dataclass(frozen=True)
@@ -113,8 +113,6 @@ def dataset_ricu_code(dataset: str) -> str:
     return mapping[key]
 
 
-
-
 def _env_path(name: str) -> Path | None:
     """Return an expanded path from an environment variable if it is set."""
     value = os.getenv(name)
@@ -126,10 +124,10 @@ def _default_output_root() -> Path:
 
 
 def _default_concept_root() -> Path:
-    return _env_path("OPENICU_YAIB_CONCEPT_ROOT") or (
-        Path.home() / "output" / "OpenICU.example" / "project" / "workspace" / "concept"
+    raise ValueError(
+        "OpenICU concept root is not configured. "
+        "Set the concept root explicitly."
     )
-
 
 def _default_ricu_concept_dict() -> Path:
     return _env_path("OPENICU_YAIB_RICU_CONCEPT_DICT") or (
@@ -142,6 +140,7 @@ def _default_icustays_csv(dataset: str) -> Path | None:
     if env_path is not None:
         return env_path
     return find_dataset_stay_file(dataset)
+
 
 def default_dataset_paths(
     *,
@@ -173,9 +172,7 @@ def default_dataset_paths(
         else _default_ricu_concept_dict()
     )
     icustays = (
-        _as_path(icustays_csv)
-        if icustays_csv is not None
-        else _default_icustays_csv(dataset)
+        _as_path(icustays_csv) if icustays_csv is not None else _default_icustays_csv(dataset)
     )
 
     ricu_code = dataset_ricu_code(dataset)
@@ -264,14 +261,18 @@ def build_and_write_yaib_wide(
     )
     lf.sink_parquet(out)
 
-    summary = scan_dyn(out).select(
-        [
-            pl.len().alias("n_rows"),
-            pl.col("stay_id").n_unique().alias("n_stays"),
-            pl.col("time").min().alias("min_time"),
-            pl.col("time").max().alias("max_time"),
-        ]
-    ).collect()
+    summary = (
+        scan_dyn(out)
+        .select(
+            [
+                pl.len().alias("n_rows"),
+                pl.col("stay_id").n_unique().alias("n_stays"),
+                pl.col("time").min().alias("min_time"),
+                pl.col("time").max().alias("max_time"),
+            ]
+        )
+        .collect()
+    )
     return WideExportResult(output_path=out, summary=summary)
 
 
@@ -306,9 +307,13 @@ def build_and_write_yaib_wide_for_dataset(
         icustays_csv=icustays_csv,
         ricu_concept_dict=ricu_concept_dict,
     )
-    out = _as_path(output_path) if output_path is not None else openicu_wide_output_path(
-        output_root=paths.output_root,
-        max_hours=max_hours,
+    out = (
+        _as_path(output_path)
+        if output_path is not None
+        else openicu_wide_output_path(
+            output_root=paths.output_root,
+            max_hours=max_hours,
+        )
     )
     spec = dataset_stay_spec(dataset)
     return build_and_write_yaib_wide(
@@ -385,19 +390,16 @@ def _normalize_ricu_stay_id(df: pl.DataFrame) -> pl.DataFrame:
     lookup = {name.lower(): name for name in df.columns}
     for candidate in (
         "patientunitstayid",  # eICU
-        "icustay_id",        # MIMIC-III
+        "icustay_id",  # MIMIC-III
         "icustayid",
-        "admissionid",       # AUMC
-        "patientid",         # HiRID
-        "caseid",            # SICdb
+        "admissionid",  # AUMC
+        "patientid",  # HiRID
+        "caseid",  # SICdb
     ):
         if candidate in lookup:
             return df.rename({lookup[candidate]: "stay_id"})
 
-    raise ValueError(
-        "Could not identify RICU stay ID column; "
-        f"available columns: {df.columns}"
-    )
+    raise ValueError(f"Could not identify RICU stay ID column; available columns: {df.columns}")
 
 
 def read_ricu_stay_windows(path: str | Path, *, max_hours: int | None = 168) -> pl.DataFrame:
@@ -422,9 +424,7 @@ def read_ricu_stay_windows(path: str | Path, *, max_hours: int | None = 168) -> 
 
     if max_hours is not None:
         windows = windows.with_columns(
-            pl.col("ricu_end")
-            .clip(upper_bound=max_hours)
-            .alias("ricu_end")
+            pl.col("ricu_end").clip(upper_bound=max_hours).alias("ricu_end")
         )
 
     return windows.with_columns(
@@ -439,9 +439,7 @@ def normalize_ricu_dynamic_reference(
     openicu_columns: list[str],
 ) -> pl.DataFrame:
     """Load R/RICU dynamic vars and apply the same window filtering as 00_main."""
-    reference = _normalize_ricu_stay_id(
-        pl.read_parquet(_as_path(reference_dynamic_path))
-    )
+    reference = _normalize_ricu_stay_id(pl.read_parquet(_as_path(reference_dynamic_path)))
 
     if "time" not in reference.columns:
         lookup = {name.lower(): name for name in reference.columns}
@@ -493,16 +491,13 @@ def normalize_wide_dtypes_for_comparison(
     vars_ = dynamic_vars or [c for c in target_columns if c not in {"stay_id", "time"}]
     present_vars = [c for c in vars_ if c in df.columns]
     selected = [c for c in target_columns if c in df.columns]
-    return (
-        df.with_columns(
-            [
-                pl.col("stay_id").cast(pl.Int64),
-                pl.col("time").cast(pl.Int64),
-                *[pl.col(c).cast(value_dtype, strict=False).alias(c) for c in present_vars],
-            ]
-        )
-        .select(selected)
-    )
+    return df.with_columns(
+        [
+            pl.col("stay_id").cast(pl.Int64),
+            pl.col("time").cast(pl.Int64),
+            *[pl.col(c).cast(value_dtype, strict=False).alias(c) for c in present_vars],
+        ]
+    ).select(selected)
 
 
 def compare_openicu_wide_to_ricu(
@@ -541,11 +536,7 @@ def compare_openicu_wide_to_ricu(
         max_hours=max_hours,
     )
 
-    valid_metric_stays = (
-        ricu_windows
-        .filter(pl.col("ricu_end").is_not_null())
-        .select("stay_id")
-    )
+    valid_metric_stays = ricu_windows.filter(pl.col("ricu_end").is_not_null()).select("stay_id")
 
     reference = normalize_ricu_dynamic_reference(
         reference_dynamic_path=reference_path,
@@ -673,13 +664,19 @@ def compare_openicu_wide_to_ricu_for_dataset(
         icustays_csv=icustays_csv,
         ricu_concept_dict=ricu_concept_dict,
     )
-    openicu_path = _as_path(openicu_wide_path) if openicu_wide_path is not None else openicu_wide_output_path(
-        output_root=paths.output_root,
-        max_hours=max_hours,
+    openicu_path = (
+        _as_path(openicu_wide_path)
+        if openicu_wide_path is not None
+        else openicu_wide_output_path(
+            output_root=paths.output_root,
+            max_hours=max_hours,
+        )
     )
     return compare_openicu_wide_to_ricu(
         openicu_wide_path=openicu_path,
-        ricu_dynamic_path=_as_path(ricu_dynamic_path) if ricu_dynamic_path is not None else paths.ricu_dynamic_path,
+        ricu_dynamic_path=_as_path(ricu_dynamic_path)
+        if ricu_dynamic_path is not None
+        else paths.ricu_dynamic_path,
         ricu_stay_windows_path=(
             _as_path(ricu_stay_windows_path)
             if ricu_stay_windows_path is not None

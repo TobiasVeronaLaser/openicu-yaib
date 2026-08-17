@@ -34,17 +34,12 @@ def test_eicu_stay_reconstructs_openicu_synthetic_timeline(
         dataset_stay_spec("eicu-crd"),
     ).collect()
 
-    expected_admission = (
-        datetime(2015, 1, 1, 9, 18)
-        - datetime(1970, 1, 1)
-    ).total_seconds() / 3600
+    expected_admission = (datetime(2015, 1, 1, 9, 18) - datetime(1970, 1, 1)).total_seconds() / 3600
 
     assert result["subject_id"].to_list() == [128927]
     assert result["stay_id"].to_list() == [141179]
     assert result["intime_hours"].to_list() == [expected_admission]
-    assert result["outtime_hours"].to_list() == [
-        expected_admission + 2042 / 60
-    ]
+    assert result["outtime_hours"].to_list() == [expected_admission + 2042 / 60]
 
 
 def test_eicu_ricu_stay_windows_normalize_patientunitstayid(

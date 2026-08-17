@@ -43,7 +43,9 @@ def resolve_openicu_workspace(path: str | Path) -> Path:
         return root.parent
     if (root / "workspace" / "concept").exists():
         return root / "workspace"
-    if (root / "concept").exists() or any((root / n).exists() for n in ("extraction", "sharding", "persisting")):
+    if (root / "concept").exists() or any(
+        (root / n).exists() for n in ("extraction", "sharding", "persisting")
+    ):
         return root
     return root
 
@@ -115,7 +117,6 @@ def _grid_from_normalized_stays(stays: pl.LazyFrame, max_hours: int | None) -> p
     )
 
 
-
 # Additional RICU concepts that are not part of the standard dynamic-variable
 # mapping but do have relevant hourly aggregation metadata.
 _RICU_AGGREGATION_TO_OPENICU = {
@@ -127,13 +128,12 @@ _RICU_AGGREGATION_TO_OPENICU = {
 }
 
 _OPENICU_TO_RICU_AGGREGATION = {
-    openicu_name: ricu_name
-    for ricu_name, openicu_name in _RICU_AGGREGATION_TO_OPENICU.items()
+    openicu_name: ricu_name for ricu_name, openicu_name in _RICU_AGGREGATION_TO_OPENICU.items()
 }
 
 
 def _aggregate_expr(column: str, aggregate: str) -> pl.Expr:
-    """Aggregate one hourly concept, defaulting to mean semantics."""
+    """Aggregate one hourly concept using the requested aggregation function."""
     aggregate = aggregate.lower()
 
     if aggregate == "mean":
@@ -186,10 +186,7 @@ def _concept_table(
                 )
             )
             .with_columns(
-                (pl.col("time_hours") - pl.col("intime_hours"))
-                .floor()
-                .cast(pl.Int64)
-                .alias("time")
+                (pl.col("time_hours") - pl.col("intime_hours")).floor().cast(pl.Int64).alias("time")
             )
         )
     mapped = mapped.filter(pl.col("time") >= 0)
@@ -237,7 +234,9 @@ def build_all_concepts_wide(
         if ricu_concept_dict is not None and uses_ricu_aggregation(dataset)
         else None
     )
-    resolved_stays = Path(stays_path).expanduser().resolve() if stays_path else find_dataset_stay_file(dataset)
+    resolved_stays = (
+        Path(stays_path).expanduser().resolve() if stays_path else find_dataset_stay_file(dataset)
+    )
     stays = scan_dataset_stays(resolved_stays, spec) if resolved_stays is not None else None
 
     tables = [
@@ -287,14 +286,22 @@ def write_all_concepts_wide(
     If ``output_root`` is provided, that directory is used instead.
     """
     workspace = resolve_openicu_workspace(openicu_output)
-    croot = Path(concept_root).expanduser().resolve() if concept_root else concept_root_from_output(openicu_output)
+    croot = (
+        Path(concept_root).expanduser().resolve()
+        if concept_root
+        else concept_root_from_output(openicu_output)
+    )
 
     if output_root is None:
         dataset_dir = workspace / "yaib" / dataset
     else:
         dataset_dir = Path(output_root).expanduser().resolve()
     dataset_dir.mkdir(parents=True, exist_ok=True)
-    name = output_name or ("openicu_all_concepts_wide.parquet" if max_hours is None else f"openicu_all_concepts_wide_{max_hours}h.parquet")
+    name = output_name or (
+        "openicu_all_concepts_wide.parquet"
+        if max_hours is None
+        else f"openicu_all_concepts_wide_{max_hours}h.parquet"
+    )
     out = dataset_dir / name
     manifest = dataset_dir / (out.stem + "_concepts.csv")
 
@@ -314,9 +321,12 @@ def write_all_concepts_wide(
             "source_parquet": [str(x.path) for x in concepts],
         }
     ).write_csv(manifest)
-    summary = pl.scan_parquet(out).select(
-        pl.len().alias("n_rows"), pl.col("stay_id").n_unique().alias("n_stays")
-    ).collect().row(0)
+    summary = (
+        pl.scan_parquet(out)
+        .select(pl.len().alias("n_rows"), pl.col("stay_id").n_unique().alias("n_stays"))
+        .collect()
+        .row(0)
+    )
     return AllConceptsExportResult(
         output_path=out,
         manifest_path=manifest,

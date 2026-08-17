@@ -11,10 +11,10 @@ import polars as pl
 from .concepts import DYNAMIC_VARS, RICU_TO_OPENICU
 from .io import (
     find_concept_file,
+    scan_dataset_stays,
     scan_mimic_icustays,
     scan_openicu_concept,
     scan_openicu_dynamic_concept,
-    scan_dataset_stays,
     scan_openicu_subject_concept_hours,
 )
 from .ricu_meta import RicuConceptMeta
@@ -78,18 +78,13 @@ def map_events_to_stays(
     return (
         mapped.with_columns(
             (
-                (pl.col("time") - pl.col("intime"))
-                .dt.total_seconds()
-                .cast(pl.Float64)
-                / 3600.0
+                (pl.col("time") - pl.col("intime")).dt.total_seconds().cast(pl.Float64) / 3600.0
             ).alias("diff_hours")
         )
         .with_columns(pl.col("diff_hours").floor().cast(pl.Int64).alias("time"))
         .filter(pl.col("time") >= 0)
         .select("stay_id", "time", "numeric_value")
     )
-
-
 
 
 def map_subject_events_to_dataset_stays(
@@ -110,10 +105,7 @@ def map_subject_events_to_dataset_stays(
         )
     return (
         mapped.with_columns(
-            (pl.col("time_hours") - pl.col("intime_hours"))
-            .floor()
-            .cast(pl.Int64)
-            .alias("time")
+            (pl.col("time_hours") - pl.col("intime_hours")).floor().cast(pl.Int64).alias("time")
         )
         .filter(pl.col("time") >= 0)
         .select("stay_id", "time", "numeric_value")
@@ -137,7 +129,11 @@ def aggregate_dataset_concept_hourly(
     mapped = map_subject_events_to_dataset_stays(
         events, stays, filter_to_icu_window=filter_to_icu_window
     )
-    aggregate = ricu_meta.aggregate_for(ricu_name, default="median") if aggregation_mode == "ricu" else "mean"
+    aggregate = (
+        ricu_meta.aggregate_for(ricu_name, default="median")
+        if aggregation_mode == "ricu"
+        else "mean"
+    )
     return (
         mapped.group_by("stay_id", "time")
         .agg(_agg_expr(ricu_name=ricu_name, output_col=ricu_name, aggregate=aggregate))
@@ -168,7 +164,6 @@ def aggregate_concept_hourly(
     )
 
 
-
 def aggregate_identity_concept_hourly(
     *,
     concept_file: str | Path,
@@ -181,7 +176,11 @@ def aggregate_identity_concept_hourly(
     events = scan_openicu_subject_concept_hours(
         concept_file, numeric_scale_hours=stay_spec.numeric_time_scale_hours
     ).filter(_range_filter_expr(ricu_meta, ricu_name))
-    aggregate = ricu_meta.aggregate_for(ricu_name, default="median") if aggregation_mode == "ricu" else "mean"
+    aggregate = (
+        ricu_meta.aggregate_for(ricu_name, default="median")
+        if aggregation_mode == "ricu"
+        else "mean"
+    )
     return (
         events.with_columns(
             pl.col("subject_id").alias("stay_id"),
@@ -238,23 +237,19 @@ def make_yaib_grid(
     if end_rounding not in {"floor", "ceil"}:
         raise ValueError("end_rounding must be 'floor' or 'ceil'.")
 
-    los_end_expr = pl.col("los_hours").floor() if end_rounding == "floor" else pl.col("los_hours").ceil()
+    los_end_expr = (
+        pl.col("los_hours").floor() if end_rounding == "floor" else pl.col("los_hours").ceil()
+    )
 
-    grid = (
-        stays.with_columns(
-            (
-                (pl.col("outtime") - pl.col("intime"))
-                .dt.total_seconds()
-                .cast(pl.Float64)
-                / 3600.0
-            ).alias("los_hours")
+    grid = stays.with_columns(
+        ((pl.col("outtime") - pl.col("intime")).dt.total_seconds().cast(pl.Float64) / 3600.0).alias(
+            "los_hours"
         )
-        .with_columns(
-            pl.when(pl.col("los_hours").is_null() | (pl.col("los_hours") < 0))
-            .then(0)
-            .otherwise(los_end_expr.cast(pl.Int64))
-            .alias("los_end")
-        )
+    ).with_columns(
+        pl.when(pl.col("los_hours").is_null() | (pl.col("los_hours") < 0))
+        .then(0)
+        .otherwise(los_end_expr.cast(pl.Int64))
+        .alias("los_end")
     )
 
     if max_hours is None:
@@ -335,7 +330,9 @@ def build_dynamic_table(
             missing.append((ricu_name, "no OpenICU mapping"))
             continue
 
-        concept_file = find_concept_file(concept_root, openicu_name, dataset=dataset, version=version)
+        concept_file = find_concept_file(
+            concept_root, openicu_name, dataset=dataset, version=version
+        )
         if concept_file is None:
             missing.append((ricu_name, f"missing parquet for OpenICU concept {openicu_name!r}"))
             continue
@@ -398,9 +395,9 @@ def build_dynamic_table(
     if include_grid:
         assert stays is not None
         if dataset_stays:
-            normalized = stays.rename({"intime_hours": "intime", "outtime_hours": "outtime"}).with_columns(
-                pl.col("intime").cast(pl.Float64), pl.col("outtime").cast(pl.Float64)
-            )
+            normalized = stays.rename(
+                {"intime_hours": "intime", "outtime_hours": "outtime"}
+            ).with_columns(pl.col("intime").cast(pl.Float64), pl.col("outtime").cast(pl.Float64))
             los = normalized.with_columns((pl.col("outtime") - pl.col("intime")).alias("los_hours"))
             end_expr = pl.col("los_hours").floor().cast(pl.Int64)
             if max_hours is not None:

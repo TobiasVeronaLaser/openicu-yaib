@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 # Datasets for which RICU concept-level aggregation metadata should be used.
 #
 # This is intentionally independent from native RICU comparison support.

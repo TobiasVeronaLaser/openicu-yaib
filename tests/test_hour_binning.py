@@ -45,10 +45,7 @@ def test_datetime_relative_hours_use_floor_bins() -> None:
     events = pl.DataFrame(
         {
             "subject_id": [1] * len(offsets_minutes),
-            "time": [
-                intime + dt.timedelta(minutes=x)
-                for x in offsets_minutes
-            ],
+            "time": [intime + dt.timedelta(minutes=x) for x in offsets_minutes],
             "numeric_value": [1.0] * len(offsets_minutes),
         }
     ).lazy()
@@ -63,11 +60,7 @@ def test_datetime_relative_hours_use_floor_bins() -> None:
     ).lazy()
 
     result = (
-        map_events_to_stays(events, stays)
-        .select("time")
-        .collect()
-        .get_column("time")
-        .to_list()
+        map_events_to_stays(events, stays).select("time").collect().get_column("time").to_list()
     )
 
     assert result == [0, 0, 0, 0, 1, 1, 1, 2]

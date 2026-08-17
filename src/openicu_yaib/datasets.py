@@ -28,7 +28,7 @@ DATASETS: tuple[DatasetSpec, ...] = (
     DatasetSpec("mimic-iv", "miiv", ("miiv",)),
     # ricu has no separate built-in/source entry corresponding to OpenICU mimic-iv-demo.
     DatasetSpec("mimic-iv-demo", None),
-    DatasetSpec("nwicu", "nwicu"),
+    DatasetSpec("nwicu", None),
     DatasetSpec("sic", "sic", ("sicdb",)),
 )
 

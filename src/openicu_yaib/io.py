@@ -60,11 +60,13 @@ def scan_openicu_concept(path: str | Path) -> pl.LazyFrame:
     missing = sorted(required - set(schema.names()))
     if missing:
         raise ValueError(f"Concept parquet {path} is missing columns: {missing}")
-    return lf.select([
-        pl.col("subject_id").cast(pl.Int64),
-        pl.col("time"),
-        pl.col("numeric_value").cast(pl.Float64),
-    ])
+    return lf.select(
+        [
+            pl.col("subject_id").cast(pl.Int64),
+            pl.col("time"),
+            pl.col("numeric_value").cast(pl.Float64),
+        ]
+    )
 
 
 def scan_openicu_dynamic_concept(path: str | Path) -> pl.LazyFrame:
@@ -87,11 +89,13 @@ def scan_openicu_dynamic_concept(path: str | Path) -> pl.LazyFrame:
             "The no-icustays path requires already mapped columns "
             "'stay_id', 'time' and 'numeric_value'."
         )
-    return lf.select([
-        pl.col("stay_id").cast(pl.Int64),
-        pl.col("time").cast(pl.Int64),
-        pl.col("numeric_value").cast(pl.Float64),
-    ])
+    return lf.select(
+        [
+            pl.col("stay_id").cast(pl.Int64),
+            pl.col("time").cast(pl.Int64),
+            pl.col("numeric_value").cast(pl.Float64),
+        ]
+    )
 
 
 def scan_mimic_icustays(path: str | Path) -> pl.LazyFrame:
@@ -103,13 +107,15 @@ def scan_mimic_icustays(path: str | Path) -> pl.LazyFrame:
     if missing:
         raise ValueError(f"ICU stays file {path} is missing columns: {missing}")
 
-    return lf.select([
-        pl.col("subject_id").cast(pl.Int64),
-        pl.col("hadm_id").cast(pl.Int64),
-        pl.col("stay_id").cast(pl.Int64),
-        pl.col("intime").cast(pl.Datetime),
-        pl.col("outtime").cast(pl.Datetime),
-    ])
+    return lf.select(
+        [
+            pl.col("subject_id").cast(pl.Int64),
+            pl.col("hadm_id").cast(pl.Int64),
+            pl.col("stay_id").cast(pl.Int64),
+            pl.col("intime").cast(pl.Datetime),
+            pl.col("outtime").cast(pl.Datetime),
+        ]
+    )
 
 
 def _column_name_case_insensitive(names: list[str], requested: str) -> str:
@@ -133,7 +139,11 @@ def _time_as_hours(expr: pl.Expr, dtype: pl.DataType, numeric_scale_hours: float
 def scan_dataset_stays(path: str | Path, spec) -> pl.LazyFrame:
     """Read a dataset-specific raw ICU-stay table into normalized hour units."""
     path = Path(path)
-    lf = pl.scan_parquet(path) if path.suffix == ".parquet" else pl.scan_csv(path, try_parse_dates=True)
+    lf = (
+        pl.scan_parquet(path)
+        if path.suffix == ".parquet"
+        else pl.scan_csv(path, try_parse_dates=True)
+    )
     schema = lf.collect_schema()
     names = schema.names()
     subject = _column_name_case_insensitive(names, spec.subject_col)
@@ -157,29 +167,19 @@ def scan_dataset_stays(path: str | Path, spec) -> pl.LazyFrame:
         hospital_offset = _column_name_case_insensitive(names, "hospitaladmitoffset")
         discharge_offset = _column_name_case_insensitive(names, "unitdischargeoffset")
 
-        hospital_admission = (
-            pl.concat_str(
-                [
-                    pl.col(year).cast(pl.String),
-                    pl.lit("-01-01 "),
-                    pl.col(hospital_time).cast(pl.String),
-                ]
-            )
-            .str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S", strict=True)
-        )
+        hospital_admission = pl.concat_str(
+            [
+                pl.col(year).cast(pl.String),
+                pl.lit("-01-01 "),
+                pl.col(hospital_time).cast(pl.String),
+            ]
+        ).str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S", strict=True)
 
-        admission = hospital_admission + pl.duration(
-            minutes=-pl.col(hospital_offset)
-        )
+        admission = hospital_admission + pl.duration(minutes=-pl.col(hospital_offset))
 
-        admission_hours = (
-            admission.dt.epoch("ms").cast(pl.Float64) / 3_600_000.0
-        )
+        admission_hours = admission.dt.epoch("ms").cast(pl.Float64) / 3_600_000.0
 
-        discharge_hours = (
-            admission_hours
-            + pl.col(discharge_offset).cast(pl.Float64) / 60.0
-        )
+        discharge_hours = admission_hours + pl.col(discharge_offset).cast(pl.Float64) / 60.0
 
         return lf.select(
             [
@@ -194,7 +194,11 @@ def scan_dataset_stays(path: str | Path, spec) -> pl.LazyFrame:
         cols.append(pl.lit(0.0).alias("intime_hours"))
     else:
         intime = _column_name_case_insensitive(names, spec.intime_col)
-        cols.append(_time_as_hours(pl.col(intime), schema[intime], spec.numeric_time_scale_hours).alias("intime_hours"))
+        cols.append(
+            _time_as_hours(pl.col(intime), schema[intime], spec.numeric_time_scale_hours).alias(
+                "intime_hours"
+            )
+        )
     if spec.outtime_col is None:
         cols.append(pl.lit(None, dtype=pl.Float64).alias("outtime_hours"))
     else:
@@ -212,7 +216,9 @@ def scan_dataset_stays(path: str | Path, spec) -> pl.LazyFrame:
     return lf.select(cols)
 
 
-def scan_openicu_subject_concept_hours(path: str | Path, numeric_scale_hours: float = 1.0) -> pl.LazyFrame:
+def scan_openicu_subject_concept_hours(
+    path: str | Path, numeric_scale_hours: float = 1.0
+) -> pl.LazyFrame:
     """Read subject-level OpenICU events and normalize time to numeric hours."""
     lf = pl.scan_parquet(path)
     schema = lf.collect_schema()
@@ -220,8 +226,10 @@ def scan_openicu_subject_concept_hours(path: str | Path, numeric_scale_hours: fl
     missing = sorted(required - set(schema.names()))
     if missing:
         raise ValueError(f"Concept parquet {path} is missing columns: {missing}")
-    return lf.select([
-        pl.col("subject_id").cast(pl.Int64),
-        _time_as_hours(pl.col("time"), schema["time"], numeric_scale_hours).alias("time_hours"),
-        pl.col("numeric_value").cast(pl.Float64),
-    ])
+    return lf.select(
+        [
+            pl.col("subject_id").cast(pl.Int64),
+            _time_as_hours(pl.col("time"), schema["time"], numeric_scale_hours).alias("time_hours"),
+            pl.col("numeric_value").cast(pl.Float64),
+        ]
+    )

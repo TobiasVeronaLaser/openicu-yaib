@@ -19,7 +19,7 @@ class RicuConceptMeta:
     concepts: dict[str, Any]
 
     @classmethod
-    def from_json(cls, path: str | Path | None) -> "RicuConceptMeta":
+    def from_json(cls, path: str | Path | None) -> RicuConceptMeta:
         if path is None:
             return cls({})
         p = Path(path)
@@ -30,7 +30,9 @@ class RicuConceptMeta:
         if isinstance(raw, dict) and "concepts" in raw and isinstance(raw["concepts"], dict):
             raw = raw["concepts"]
         if not isinstance(raw, dict):
-            raise ValueError("RICU concept dictionary must be a JSON object or contain a 'concepts' object.")
+            raise ValueError(
+                "RICU concept dictionary must be a JSON object or contain a 'concepts' object."
+            )
         return cls(raw)
 
     def concept(self, name: str) -> dict[str, Any]:
