@@ -137,7 +137,7 @@ def aggregate_dataset_concept_hourly(
     mapped = map_subject_events_to_dataset_stays(
         events, stays, filter_to_icu_window=filter_to_icu_window
     )
-    aggregate = ricu_meta.aggregate_for(ricu_name, default="mean") if aggregation_mode == "ricu" else "mean"
+    aggregate = ricu_meta.aggregate_for(ricu_name, default="median") if aggregation_mode == "ricu" else "mean"
     return (
         mapped.group_by("stay_id", "time")
         .agg(_agg_expr(ricu_name=ricu_name, output_col=ricu_name, aggregate=aggregate))
@@ -159,7 +159,7 @@ def aggregate_concept_hourly(
     mapped = map_events_to_stays(events, stays, filter_to_icu_window=filter_to_icu_window)
     aggregate = "mean"
     if aggregation_mode == "ricu":
-        aggregate = ricu_meta.aggregate_for(ricu_name, default="mean")
+        aggregate = ricu_meta.aggregate_for(ricu_name, default="median")
 
     return (
         mapped.group_by("stay_id", "time")
@@ -181,7 +181,7 @@ def aggregate_identity_concept_hourly(
     events = scan_openicu_subject_concept_hours(
         concept_file, numeric_scale_hours=stay_spec.numeric_time_scale_hours
     ).filter(_range_filter_expr(ricu_meta, ricu_name))
-    aggregate = ricu_meta.aggregate_for(ricu_name, default="mean") if aggregation_mode == "ricu" else "mean"
+    aggregate = ricu_meta.aggregate_for(ricu_name, default="median") if aggregation_mode == "ricu" else "mean"
     return (
         events.with_columns(
             pl.col("subject_id").alias("stay_id"),
@@ -212,7 +212,7 @@ def aggregate_dynamic_concept_hourly(
     )
     aggregate = "mean"
     if aggregation_mode == "ricu":
-        aggregate = ricu_meta.aggregate_for(ricu_name, default="mean")
+        aggregate = ricu_meta.aggregate_for(ricu_name, default="median")
 
     return (
         events.group_by("stay_id", "time")

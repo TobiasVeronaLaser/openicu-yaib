@@ -377,13 +377,36 @@ def _series_to_hours(series: pl.Series) -> pl.Series:
     return _numeric_series_to_hours(series.cast(pl.Float64))
 
 
+def _normalize_ricu_stay_id(df: pl.DataFrame) -> pl.DataFrame:
+    """Normalize dataset-specific RICU ICU-stay identifiers to ``stay_id``."""
+    if "stay_id" in df.columns:
+        return df
+
+    lookup = {name.lower(): name for name in df.columns}
+    for candidate in (
+        "patientunitstayid",  # eICU
+        "icustay_id",        # MIMIC-III
+        "icustayid",
+        "admissionid",       # AUMC
+        "patientid",         # HiRID
+        "caseid",            # SICdb
+    ):
+        if candidate in lookup:
+            return df.rename({lookup[candidate]: "stay_id"})
+
+    raise ValueError(
+        "Could not identify RICU stay ID column; "
+        f"available columns: {df.columns}"
+    )
+
+
 def read_ricu_stay_windows(path: str | Path, *, max_hours: int | None = 168) -> pl.DataFrame:
     """Read R/RICU stay windows and normalize start/end to integer hours.
 
     The archive notebooks used both R duration columns and millisecond columns.
     This helper accepts both forms and caps ``end`` to ``max_hours`` when given.
     """
-    windows = pl.read_parquet(_as_path(path))
+    windows = _normalize_ricu_stay_id(pl.read_parquet(_as_path(path)))
     required = {"stay_id", "start", "end"}
     missing = required - set(windows.columns)
     if missing:
@@ -416,8 +439,28 @@ def normalize_ricu_dynamic_reference(
     openicu_columns: list[str],
 ) -> pl.DataFrame:
     """Load R/RICU dynamic vars and apply the same window filtering as 00_main."""
-    reference = pl.read_parquet(_as_path(reference_dynamic_path)).with_columns(
-        [pl.col("stay_id").cast(pl.Int64), pl.col("time").cast(pl.Int64)]
+    reference = _normalize_ricu_stay_id(
+        pl.read_parquet(_as_path(reference_dynamic_path))
+    )
+
+    if "time" not in reference.columns:
+        lookup = {name.lower(): name for name in reference.columns}
+        if "labresultoffset" in lookup:
+            source_time = lookup["labresultoffset"]
+            reference = reference.with_columns(
+                _series_to_hours(reference[source_time]).alias("time")
+            )
+        else:
+            raise ValueError(
+                "Could not identify RICU dynamic time column; "
+                f"available columns: {reference.columns}"
+            )
+
+    reference = reference.with_columns(
+        [
+            pl.col("stay_id").cast(pl.Int64),
+            pl.col("time").cast(pl.Int64),
+        ]
     )
 
     selected_columns = [c for c in openicu_columns if c in reference.columns]

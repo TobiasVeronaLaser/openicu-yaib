@@ -197,7 +197,7 @@ def _concept_table(
         mapped = mapped.filter(pl.col("time") <= max_hours)
     ricu_name = _OPENICU_TO_RICU_AGGREGATION.get(item.name)
     aggregate = (
-        ricu_meta.aggregate_for(ricu_name, default="mean")
+        ricu_meta.aggregate_for(ricu_name, default="median")
         if ricu_meta is not None and ricu_name is not None
         else "mean"
     )

@@ -143,6 +143,53 @@ def scan_dataset_stays(path: str | Path, spec) -> pl.LazyFrame:
         pl.col(subject).cast(pl.Int64).alias("subject_id"),
         pl.col(stay).cast(pl.Int64).alias("stay_id"),
     ]
+
+    # OpenICU places eICU events on a synthetic datetime axis:
+    #
+    #   hospital discharge year, January 1 at hospital admission time
+    #   - hospitaladmitoffset
+    #
+    # Because eICU offsets are relative to ICU admission, this reconstructs
+    # exactly the admission_timestamp used by the OpenICU eICU configs.
+    if spec.dataset in {"eicu", "eicu_demo", "eicu-crd", "eicu-demo"}:
+        year = _column_name_case_insensitive(names, "hospitaldischargeyear")
+        hospital_time = _column_name_case_insensitive(names, "hospitaladmittime24")
+        hospital_offset = _column_name_case_insensitive(names, "hospitaladmitoffset")
+        discharge_offset = _column_name_case_insensitive(names, "unitdischargeoffset")
+
+        hospital_admission = (
+            pl.concat_str(
+                [
+                    pl.col(year).cast(pl.String),
+                    pl.lit("-01-01 "),
+                    pl.col(hospital_time).cast(pl.String),
+                ]
+            )
+            .str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S", strict=True)
+        )
+
+        admission = hospital_admission + pl.duration(
+            minutes=-pl.col(hospital_offset)
+        )
+
+        admission_hours = (
+            admission.dt.epoch("ms").cast(pl.Float64) / 3_600_000.0
+        )
+
+        discharge_hours = (
+            admission_hours
+            + pl.col(discharge_offset).cast(pl.Float64) / 60.0
+        )
+
+        return lf.select(
+            [
+                pl.col(subject).cast(pl.Int64).alias("subject_id"),
+                pl.col(stay).cast(pl.Int64).alias("stay_id"),
+                admission_hours.alias("intime_hours"),
+                discharge_hours.alias("outtime_hours"),
+            ]
+        )
+
     if spec.intime_col is None:
         cols.append(pl.lit(0.0).alias("intime_hours"))
     else:
